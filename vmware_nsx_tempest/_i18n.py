@@ -14,7 +14,7 @@
 
 import oslo_i18n
 
-DOMAIN = "vmware-nsx-tempest"
+DOMAIN = "vmware_nsx_tempest"
 
 _translators = oslo_i18n.TranslatorFactory(domain=DOMAIN)
 

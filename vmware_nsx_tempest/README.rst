@@ -59,7 +59,7 @@ Installation:
    and under section of Entry-points::
 
     [tempest.test_plugins]
-    vmware-nsx-tempest-plugin = vmware_nsx_tempest.plugin:VMwareNsxTempestPlugin
+    vmware-nsx-tempest-plugin = vmware_nsx_tempest.plugin:VmwareNsxTempestPlugin
 
 #. Validate installed vmware_nsx_tempest successfully do::
 
