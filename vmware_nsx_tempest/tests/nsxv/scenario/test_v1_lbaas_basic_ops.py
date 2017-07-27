@@ -17,7 +17,7 @@ import shlex
 import subprocess
 import tempfile
 import time
-import urllib2
+import urllib.request, urllib.error, urllib.parse
 
 import six
 from tempest import config
@@ -84,7 +84,7 @@ class TestLBaaSBasicOps(manager.NetworkScenarioTest):
         self._set_net_and_subnet()
 
     def tearDown(self):
-        for s_id in self.server_ips.keys():
+        for s_id in list(self.server_ips.keys()):
             try:
                 self.servers_client.delete_server(s_id)
             except Exception:
@@ -118,7 +118,7 @@ class TestLBaaSBasicOps(manager.NetworkScenarioTest):
         subnets_client = self.subnets_client
 
         router_kwargs = dict(client=routers_client, namestart=namestart)
-        for k in kwargs.keys():
+        for k in list(kwargs.keys()):
             if k in ('distributed', 'router_type', 'router_size'):
                 router_kwargs[k] = kwargs.pop(k)
         router = self._create_router(**router_kwargs)
@@ -266,13 +266,13 @@ class TestLBaaSBasicOps(manager.NetworkScenarioTest):
     def _check_connection(self, check_ip, port=80):
         def try_connect(ip, port):
             try:
-                resp = urllib2.urlopen("http://{0}:{1}/".format(ip, port))
+                resp = urllib.request.urlopen("http://{0}:{1}/".format(ip, port))
                 if resp.getcode() == 200:
                     return True
                 return False
             except IOError:
                 return False
-            except urllib2.HTTPError:
+            except urllib.error.HTTPError:
                 return False
         timeout = CONF.validation.ping_timeout
         start = time.time()
@@ -401,11 +401,11 @@ class TestLBaaSBasicOps(manager.NetworkScenarioTest):
         counters = dict.fromkeys(servers, 0)
         for i in range(self.num):
             try:
-                server = urllib2.urlopen("http://{0}/".format(vip_ip)).read()
+                server = urllib.request.urlopen("http://{0}/".format(vip_ip)).read()
                 counters[server] += 1
             # HTTP exception means fail of server, so don't increase counter
             # of success and continue connection tries
-            except urllib2.HTTPError:
+            except urllib.error.HTTPError:
                 continue
         # Assert that each member of the pool gets balanced at least once
         for member, counter in six.iteritems(counters):
