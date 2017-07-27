@@ -16,13 +16,14 @@
 import os
 import subprocess
 
-import base_provider as base
 from oslo_log import log as logging
 import six
 from tempest import config
 from tempest.lib.common.utils import data_utils
 from tempest.lib.common.utils import test_utils
 from tempest.lib import decorators
+
+from vmware_nsx_tempest.tests.nsxv.api import base_provider as base
 
 CONF = config.CONF
 LOG = logging.getLogger(__name__)

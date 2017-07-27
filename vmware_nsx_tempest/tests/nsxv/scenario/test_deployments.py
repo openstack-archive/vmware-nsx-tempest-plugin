@@ -18,10 +18,11 @@ import time
 from tempest import config
 from tempest import test
 
-import manager_topo_deployment as dmgr
 from tempest.lib.common.utils import data_utils
 from tempest.lib import decorators
 
+from vmware_nsx_tempest.tests.nsxv.scenario \
+    import manager_topo_deployment as dmgr
 CONF = config.CONF
 LOG = dmgr.manager.log.getLogger(__name__)
 

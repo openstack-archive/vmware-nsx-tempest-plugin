@@ -15,7 +15,6 @@
 
 import re
 
-import base_provider as base
 import six
 from tempest import config
 from tempest.lib.common.utils import data_utils
@@ -24,6 +23,7 @@ from tempest.lib import decorators
 from tempest import test
 
 from vmware_nsx_tempest.services import nsxv_client
+from vmware_nsx_tempest.tests.nsxv.api import base_provider as base
 
 CONF = config.CONF
 

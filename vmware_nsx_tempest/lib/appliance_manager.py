@@ -83,7 +83,7 @@ class ApplianceManager(manager.NetworkScenarioTest):
         return self.topology_keypairs[server['key_name']]['private_key']
 
     def create_topology_router(self, router_name, routers_client=None,
-                              **kwargs):
+                               **kwargs):
         if not routers_client:
             routers_client = self.routers_client
         router_name_ = constants.APPLIANCE_NAME_STARTS_WITH + router_name
@@ -94,8 +94,9 @@ class ApplianceManager(manager.NetworkScenarioTest):
         self.topology_routers[router_name] = router
         return router
 
-    def create_topology_network(self, network_name, networks_client=None,
-                       tenant_id=None, port_security_enabled=True, **kwargs):
+    def create_topology_network(
+            self, network_name, networks_client=None,
+            tenant_id=None, port_security_enabled=True, **kwargs):
         if not networks_client:
             networks_client = self.networks_client
         if not tenant_id:
@@ -128,12 +129,14 @@ class ApplianceManager(manager.NetworkScenarioTest):
 
         def cidr_in_use(cidr, tenant_id):
             """Check cidr existence
+
             :returns: True if subnet with cidr already exist in tenant
                   False else
+
             """
             cidr_in_use = \
-                self.os_admin.subnets_client.list_subnets(tenant_id=tenant_id,
-                cidr=cidr)['subnets']
+                self.os_admin.subnets_client.list_subnets(
+                    tenant_id=tenant_id, cidr=cidr)['subnets']
             return len(cidr_in_use) != 0
 
         if ip_version == 6:
