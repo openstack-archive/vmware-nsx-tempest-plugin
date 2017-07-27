@@ -110,10 +110,10 @@ NSXvGroup = [
                help="Specific for router_size tests. This value defines"
                     " how long http.request should retry."),
     cfg.BoolOpt('no_router_type',
-               default=False,
-               help="router_type is NSXv extension."
-                    "Set it to True allow tests to remove this attribute"
-                    " when creating router."),
+                default=False,
+                help="router_type is NSXv extension."
+                     "Set it to True allow tests to remove this attribute"
+                     " when creating router."),
     cfg.ListOpt('bugs_to_resolve',
                 default=[],
                 help="Bugs to be resolved. Define this at tempest.conf and"
@@ -129,10 +129,10 @@ NSXvGroup = [
                help="NSX security-policy ID used to create the 2nd"
                     " security-group-policy, and != default_policy_id."),
     cfg.BoolOpt('allow_tenant_rules_with_policy',
-               default=False,
-               help="Default=False; a tenant cannot create security-group."
-                    " If True, tenant can create non-policy security-group."
-                    " Sync this value with nsx.ini file."),
+                default=False,
+                help="Default=False; a tenant cannot create security-group."
+                     " If True, tenant can create non-policy security-group."
+                     " Sync this value with nsx.ini file."),
 ]
 
 
