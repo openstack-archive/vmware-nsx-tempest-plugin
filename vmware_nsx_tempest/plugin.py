@@ -1,4 +1,4 @@
-# Copyright 2015 VMware, Inc.
+# Copyright 2017 VMware, Inc.
 #
 # All Rights Reserved
 #
@@ -31,7 +31,7 @@ _opts = [
 ]
 
 
-class VMwareNsxTempestPlugin(plugins.TempestPlugin):
+class VmwareNsxTempestPlugin(plugins.TempestPlugin):
 
     """Our addon configuration is defined at vmware_nsx_tempest/config.py
 
