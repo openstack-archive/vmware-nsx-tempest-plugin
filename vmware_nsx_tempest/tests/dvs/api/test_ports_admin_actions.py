@@ -13,9 +13,10 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
-import base_dvs as base
 from tempest.lib.common.utils import data_utils
 from tempest.lib import decorators
+
+from vmware_nsx_tempest.tests.dvs.api import base_dvs as base
 
 
 class AdminPortsTestJSON(base.BaseDvsAdminNetworkTest):
