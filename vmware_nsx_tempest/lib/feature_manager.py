@@ -31,8 +31,8 @@ CONF = config.CONF
 class FeatureManager(traffic_manager.TrafficManager):
     @classmethod
     def setup_clients(cls):
-        """
-        Create various client connections. Such as NSXv3 and L2 Gateway.
+        """Create various client connections. Such as NSXv3 and L2 Gateway.
+
         """
         super(FeatureManager, cls).setup_clients()
         try:
@@ -66,13 +66,13 @@ class FeatureManager(traffic_manager.TrafficManager):
     # L2Gateway base class. To get basics of L2GW.
     #
     def create_l2gw(self, l2gw_name, l2gw_param):
-        """
-        Creates L2GW and returns the response.
+        """Creates L2GW and returns the response.
 
         :param l2gw_name: name of the L2GW
         :param l2gw_param: L2GW parameters
 
         :return: response of L2GW create API
+
         """
         LOG.info("l2gw name: %(name)s, l2gw_param: %(devices)s ",
                  {"name": l2gw_name, "devices": l2gw_param})
@@ -96,12 +96,12 @@ class FeatureManager(traffic_manager.TrafficManager):
         return rsp, devices
 
     def delete_l2gw(self, l2gw_id):
-        """
-        Delete L2gw.
+        """Delete L2gw.
 
         :param l2gw_id: L2GW id to delete l2gw.
 
         :return: response of the l2gw delete API.
+
         """
         LOG.info("L2GW id: %(id)s to be deleted.", {"id": l2gw_id})
         rsp = self.l2gw_client.delete_l2_gateway(l2gw_id)
@@ -109,24 +109,24 @@ class FeatureManager(traffic_manager.TrafficManager):
         return rsp
 
     def update_l2gw(self, l2gw_id, l2gw_new_name, devices):
-        """
-        Update existing L2GW.
+        """Update existing L2GW.
 
         :param l2gw_id: L2GW id to update its parameters.
         :param l2gw_new_name: name of the L2GW.
         :param devices: L2GW parameters.
 
         :return: Response of the L2GW update API.
+
         """
         rsp = self.l2gw_client.update_l2_gateway(l2gw_id,
                                                  name=l2gw_new_name, **devices)
         return rsp
 
     def nsx_bridge_cluster_info(self):
-        """
-        Collect the device and interface name of the nsx brdige cluster.
+        """Collect the device and interface name of the nsx brdige cluster.
 
         :return: nsx bridge id and display name.
+
         """
         response = self.nsx_client.get_bridge_cluster_info()
         if len(response) == 0:
@@ -134,12 +134,12 @@ class FeatureManager(traffic_manager.TrafficManager):
         return [(x.get("id"), x.get("display_name")) for x in response]
 
     def create_l2gw_connection(self, l2gwc_param):
-        """
-        Creates L2GWC and return the response.
+        """Creates L2GWC and return the response.
 
         :param l2gwc_param: L2GWC parameters.
 
         :return: response of L2GWC create API.
+
         """
         LOG.info("l2gwc param: %(param)s ", {"param": l2gwc_param})
         l2gwc_request_body = {"l2_gateway_id": l2gwc_param["l2_gateway_id"],
@@ -158,12 +158,12 @@ class FeatureManager(traffic_manager.TrafficManager):
         return rsp
 
     def delete_l2gw_connection(self, l2gwc_id):
-        """
-        Delete L2GWC and returns the response.
+        """Delete L2GWC and returns the response.
 
         :param l2gwc_id: L2GWC id to delete L2GWC.
 
         :return: response of the l2gwc delete API.
+
         """
         LOG.info("L2GW connection id: %(id)s to be deleted",
                  {"id": l2gwc_id})
