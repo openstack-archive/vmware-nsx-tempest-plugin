@@ -16,6 +16,7 @@ import collections
 
 import netaddr
 from oslo_log import log as logging
+from oslo_utils import netutils
 
 from tempest import config
 from tempest.lib.common.utils import data_utils
@@ -31,7 +32,7 @@ LOG = logging.getLogger(__name__)
 
 class ApplianceManager(manager.NetworkScenarioTest):
     server_details = collections.namedtuple('server_details',
-                                            ['server', 'floating_ip',
+                                            ['server', 'floating_ips',
                                              'networks'])
 
     def setUp(self):
@@ -45,6 +46,11 @@ class ApplianceManager(manager.NetworkScenarioTest):
         self.topology_config_drive = CONF.compute_feature_enabled.config_drive
         self.topology_keypairs = {}
         self.servers_details = {}
+        self.topology_port_ids = {}
+        self.image_ref = CONF.compute.image_ref
+        self.flavor_ref = CONF.compute.flavor_ref
+        self.run_ssh = CONF.validation.run_validation
+        self.ssh_user = CONF.validation.image_ssh_user
 
     def get_internal_ips(self, server, network, device="network"):
         internal_ips = [p['fixed_ips'][0]['ip_address'] for p in
@@ -83,11 +89,15 @@ class ApplianceManager(manager.NetworkScenarioTest):
         return self.topology_keypairs[server['key_name']]['private_key']
 
     def create_topology_router(self, router_name, routers_client=None,
-                               **kwargs):
+                               tenant_id=None, **kwargs):
         if not routers_client:
             routers_client = self.routers_client
+        if not tenant_id:
+            tenant_id = routers_client.tenant_id
         router_name_ = constants.APPLIANCE_NAME_STARTS_WITH + router_name
-        router = self._create_router(namestart=router_name_, **kwargs)
+        name = data_utils.rand_name(router_name_)
+        router = routers_client.create_router(
+            name=name, admin_state_up=True, tenant_id=tenant_id)['router']
         public_network_info = {"external_gateway_info": dict(
             network_id=self.topology_public_network_id)}
         routers_client.update_router(router['id'], **public_network_info)
@@ -189,6 +199,44 @@ class ApplianceManager(manager.NetworkScenarioTest):
     def create_topology_security_group(self, **kwargs):
         return self._create_security_group(**kwargs)
 
+    def _get_server_portid_and_ip4(self, server, ip_addr=None):
+        ports = self.os_admin.ports_client.list_ports(
+            device_id=server['id'], fixed_ip=ip_addr)['ports']
+        p_status = ['ACTIVE']
+        if getattr(CONF.service_available, 'ironic', False):
+            p_status.append('DOWN')
+        port_map = [(p["id"], fxip["ip_address"])
+                    for p in ports
+                    for fxip in p["fixed_ips"]
+                    if netutils.is_valid_ipv4(fxip["ip_address"])
+                    and p['status'] in p_status]
+        inactive = [p for p in ports if p['status'] != 'ACTIVE']
+        if inactive:
+            LOG.warning("Instance has ports that are not ACTIVE: %s", inactive)
+
+        self.assertNotEqual(0, len(port_map),
+                            "No IPv4 addresses found in: %s" % ports)
+        return port_map
+
+    def create_floatingip(self, thing, port_id, external_network_id=None,
+                          ip4=None, client=None):
+        """Create a floating IP and associates to a resource/port on Neutron"""
+        if not external_network_id:
+            external_network_id = self.topology_public_network_id
+        if not client:
+            client = self.floating_ips_client
+        result = client.create_floatingip(
+            floating_network_id=external_network_id,
+            port_id=port_id,
+            tenant_id=thing['tenant_id'],
+            fixed_ip_address=ip4
+        )
+        floating_ip = result['floatingip']
+        self.addCleanup(test_utils.call_and_ignore_notfound_exc,
+                        client.delete_floatingip,
+                        floating_ip['id'])
+        return floating_ip
+
     def create_topology_instance(
             self, server_name, networks, security_groups=None,
             config_drive=None, keypair=None, image_id=None,
@@ -220,18 +268,63 @@ class ApplianceManager(manager.NetworkScenarioTest):
         for net in networks:
             net_ = {"uuid": net["id"]}
             networks_.append(net_)
-        # Deploy server with all teh args.
+        # Deploy server with all the args.
         server = self.create_server(
             name=server_name_, networks=networks_, clients=clients, **kwargs)
+        floating_ips = []
         if create_floating_ip:
-            floating_ip = self.create_floating_ip(server)
-            server["floating_ip"] = floating_ip
-            self.topology_servers_floating_ip.append(floating_ip)
-        else:
-            floating_ip = None
+            ports = self._get_server_portid_and_ip4(server)
+            for port_id, ip4 in ports:
+                floating_ip = self.create_floatingip(server, port_id, ip4=ip4)
+                if server.get("floating_ips"):
+                    server["floating_ips"].append(floating_ip)
+                else:
+                    server["floating_ips"] = [floating_ip]
+                self.topology_servers_floating_ip.append(floating_ip)
+                floating_ips.append(floating_ip)
         server_details = self.server_details(server=server,
-                                             floating_ip=floating_ip,
+                                             floating_ips=floating_ips,
                                              networks=networks)
         self.servers_details[server_name] = server_details
         self.topology_servers[server_name] = server
         return server
+
+    def _list_ports(self, *args, **kwargs):
+        """List ports using admin creds """
+        ports_list = self.os_admin.ports_client.list_ports(
+            *args, **kwargs)
+        return ports_list['ports']
+
+    def get_network_ports_id(self):
+        for port in self._list_ports():
+            for fixed_ip in port["fixed_ips"]:
+                ip = fixed_ip["ip_address"]
+                port_id = port["id"]
+                tenant_id = port["tenant_id"]
+                if tenant_id in self.topology_port_ids:
+                    self.topology_port_ids[tenant_id][ip] = port_id
+                else:
+                    self.topology_port_ids[tenant_id] = {ip: port_id}
+
+    def get_glance_image_id(self, params):
+        """
+        Get the glance image id based on the params
+
+        :param params: List of sub-string of image name
+        :return:
+        """
+        # Retrieve the list of images that meet the filter
+        images_list = self.os_admin.image_client_v2.list_images()['images']
+        # Validate that the list was fetched sorted accordingly
+        msg = "No images were found that met the filter criteria."
+        self.assertNotEmpty(images_list, msg)
+        image_id = None
+        for image in images_list:
+            for param in params:
+                if not param.lower() in image["name"].lower():
+                    break
+            else:
+                image_id = image["id"]
+        self.assertIsNotNone(image_id, msg)
+        return image_id
+
