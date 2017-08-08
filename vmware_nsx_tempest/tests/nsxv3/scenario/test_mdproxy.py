@@ -11,26 +11,24 @@
 #    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 #    License for the specific language governing permissions and limitations
 #    under the License.
-
 from oslo_log import log as logging
 
 from tempest import config
-from tempest import exceptions
 from tempest.lib.common.utils import data_utils
 from tempest.lib.common.utils import test_utils
 from tempest.lib import decorators
 from tempest import test
 
 from vmware_nsx_tempest.common import constants
+from vmware_nsx_tempest.lib import feature_manager
 from vmware_nsx_tempest.services import nsxv3_client
-from vmware_nsx_tempest.tests.scenario import manager
 
 CONF = config.CONF
 
 LOG = logging.getLogger(__name__)
 
 
-class TestMDProxy(manager.NetworkScenarioTest):
+class TestMDProxy(feature_manager.FeatureManager):
     """Test MDProxy.
 
     Adding test cases to test MDProxy in different scenarios such as
@@ -137,130 +135,147 @@ class TestMDProxy(manager.NetworkScenarioTest):
         self.assertIsNotNone(port_id, "Failed to find Instance's port id!!!")
         return port_id
 
-    def _verify_md(self, md_url, expected_value="", check_exist_only=False,
-                   sub_result=None):
-        def exec_cmd_and_verify_output():
-            cmd = "curl " + md_url
-            exec_cmd_retried = 0
-            import time
-            while exec_cmd_retried < \
-                    constants.MAX_NO_OF_TIMES_EXECUTION_OVER_SSH:
-                result = self.ssh_client.exec_command(cmd)
-                self.assertIsNotNone(result)
-                if not result == "":
-                    break
-                    exec_cmd_retried += 1
-                time.sleep(constants.INTERVAL_BETWEEN_EXEC_RETRY_ON_SSH)
-                LOG.info("Tried %s times!!!", exec_cmd_retried)
-            if check_exist_only:
-                return "Verification is successful!"
-            msg = ("Failed while verifying metadata on server. Result "
-                   "of command %r is NOT %r." % (cmd, expected_value))
-            if sub_result:
-                msg2 = ("Failed to verify incorrect passowrd on metadata"
-                        "server. Result %r is NOT in %r." % (
-                            sub_result, result))
-                self.assertIn(sub_result, result, msg2)
-                return "Verification is successful!"
-            self.assertEqual(expected_value, result, msg)
-            return "Verification is successful!"
+    def _verify_md(self, md_url, expected_value="",
+                   sub_result=None, ssh_client=None):
+        cmd = "curl " + md_url
+        self.exec_cmd_on_server_using_fip(
+            cmd, ssh_client=ssh_client, sub_result=sub_result,
+            expected_value=expected_value)
 
-        if not test_utils.call_until_true(exec_cmd_and_verify_output,
-                                          CONF.compute.build_timeout,
-                                          CONF.compute.build_interval):
-            raise exceptions.TimeoutException("Timed out while waiting to "
-                                              "verify metadata on server. "
-                                              "%s is empty." % md_url)
-
-    def verify_metadata_in_detail(self, instance):
+    def verify_metadata_in_detail(self, instance, ssh_client=None):
         # Check floating IPv4 in Metadata.
         md_url_pubic_ipv4 = constants.MD_BASE_URL + \
             "latest/meta-data/public-ipv4"
-        self._verify_md(md_url=md_url_pubic_ipv4, expected_value=self.fip)
+        fip = self.topology_servers["server_mdproxy_1"]["floating_ip"][
+            "floating_ip_address"]
+        fixed_ip = self.topology_servers["server_mdproxy_1"]["floating_ip"][
+            "fixed_ip_address"]
+        instance_name = instance["name"].replace("_", "-")
+        self._verify_md(md_url=md_url_pubic_ipv4, expected_value=fip,
+                        ssh_client=ssh_client)
         # Check hostname in Metadata.
         md_url_hostname = constants.MD_BASE_URL + "latest/meta-data/hostname"
         self._verify_md(md_url=md_url_hostname,
-                        expected_value=instance["name"] + ".novalocal")
+                        expected_value=instance_name + ".novalocal",
+                        ssh_client=ssh_client)
         # Check local IPv4 in Metadata.
         md_url_local_ipv4 = constants.MD_BASE_URL + \
             "latest/meta-data/local-ipv4"
-        self._verify_md(md_url=md_url_local_ipv4, check_exist_only=True)
+        self._verify_md(md_url=md_url_local_ipv4, expected_value=fixed_ip,
+                        ssh_client=ssh_client)
         # Check hostname in Metadata of 2009-04-04 folder.
         md_url_hostname = constants.MD_BASE_URL + \
             "2009-04-04/meta-data/hostname"
         self._verify_md(md_url=md_url_hostname,
-                        expected_value=instance["name"] + ".novalocal")
+                        expected_value=instance_name + ".novalocal",
+                        ssh_client=ssh_client)
         # Check hostname in Metadata of 1.0 folder.
         md_url_hostname = constants.MD_BASE_URL + "1.0/meta-data/hostname"
         self._verify_md(md_url=md_url_hostname,
-                        expected_value=instance["name"] + ".novalocal")
+                        expected_value=instance_name + ".novalocal",
+                        ssh_client=ssh_client)
 
-    def verify_md_proxy_logical_ports_on_backend(self):
+    def verify_md_proxy_logical_ports_on_backend(self, tenant_id, network_id):
         md_counter = 0
         logical_ports = self.nsx.get_os_logical_ports()
         for port_index in range(len(logical_ports)):
             if logical_ports[port_index]["attachment"][
                     "attachment_type"] == "METADATA_PROXY":
-                md_counter += 1
-                msg = "Admin state of MDProxy logical port is DOWN!!!"
+                if logical_ports[port_index]["tags"][0]["tag"] == network_id:
+                    msg = "MDproxy logical port does not have proper tenant " \
+                          "id!!!"
+                    self.assertEqual(
+                        tenant_id, logical_ports[port_index]["tags"][1][
+                            "tag"], msg)
+                    md_counter += 1
+                msg1 = "Admin state of MDProxy logical port is DOWN!!!"
                 msg2 = "LS name does not start with mdproxy!!!"
                 msg3 = "MDproxy logical port does not have any auto tag!!!"
+                msg4 = "MDproxy logical port does not have scope tag as " \
+                       "os-neutron-net-id!!!"
+                msg5 = "MDproxy logical port does not have scope tag as " \
+                       "os-project-id!!!"
+                msg6 = "MDproxy logical port does not have scope tag as " \
+                       "os-project-name!!!"
+                msg7 = "MDproxy logical port does not have scope tag as " \
+                       "os-api-version!!!"
                 self.assertEqual(
-                    "UP", logical_ports[port_index]["admin_state"], msg)
+                    "UP", logical_ports[port_index]["admin_state"], msg1)
                 self.assertIn("mdproxy-",
                               logical_ports[port_index]["display_name"], msg2)
                 self.assertNotEqual(0, len(logical_ports[port_index]["tags"]),
                                     msg3)
+                self.assertEqual(
+                    "os-neutron-net-id",
+                    logical_ports[port_index]["tags"][0]["scope"],
+                    msg4)
+                self.assertEqual(
+                    "os-project-id",
+                    logical_ports[port_index]["tags"][1]["scope"],
+                    msg5)
+                self.assertEqual(
+                    "os-project-name",
+                    logical_ports[port_index]["tags"][2]["scope"],
+                    msg6)
+                self.assertEqual(
+                    "os-api-version",
+                    logical_ports[port_index]["tags"][3]["scope"],
+                    msg7)
         self.assertNotEqual(0, md_counter, "No logical port found for MD "
                                            "proxy!!!")
+
+    def deploy_mdproxy_topology(self):
+        router_mdproxy = self.create_topology_router("router_mdproxy")
+        network_mdproxy = self.create_topology_network("network_mdproxy")
+        self.create_topology_subnet(
+            "subnet_web", network_mdproxy, router_id=router_mdproxy["id"])
+        self.create_topology_instance(
+            "server_mdproxy_1", [network_mdproxy])
+        self.get_network_ports_id()
 
     @decorators.idempotent_id("e9a93161-d852-414d-aa55-36d465ea45df")
     @test.services("compute", "network")
     def test_mdproxy_ping(self):
-        router = self._create_router(
-            router_name=data_utils.rand_name("router-MDProxy"),
-            external_network_id=CONF.network.public_network_id)
-        (network_id, subnet_id) = self._create_net_subnet_router_interface(
-            router)
-        networks_ids = {"uuid": network_id}
-        instance, keypair = self._create_server_on_networks([networks_ids])
-        port_id = self._get_port_id(network_id, subnet_id, instance)
-        self.verify_ssh(keypair=keypair, instance=instance, port_id=port_id)
+        self.deploy_mdproxy_topology()
+        ssh_client = self.verify_server_ssh(server=self.topology_servers[
+            "server_mdproxy_1"])
         md_url_pubic_ipv4 = constants.MD_BASE_URL + \
             "latest/meta-data/public-ipv4"
-        self._verify_md(md_url=md_url_pubic_ipv4, expected_value=self.fip)
+        fip = self.topology_servers["server_mdproxy_1"][
+            "floating_ip"]["floating_ip_address"]
+        self._verify_md(md_url=md_url_pubic_ipv4, expected_value=fip,
+                        ssh_client=ssh_client)
 
     @decorators.idempotent_id("743f34a6-58b8-4288-a07f-7bee21c55051")
     @test.services("compute", "network")
     def test_mdproxy_verify_backend(self):
-        router = self._create_router(
-            router_name=data_utils.rand_name("router-MDProxy"),
-            external_network_id=CONF.network.public_network_id)
-        (network_id, subnet_id) = self._create_net_subnet_router_interface(
-            router)
-        networks_ids = {"uuid": network_id}
-        instance, keypair = self._create_server_on_networks([networks_ids])
-        port_id = self._get_port_id(network_id, subnet_id, instance)
-        self.verify_ssh(keypair=keypair, instance=instance, port_id=port_id)
-        self.verify_metadata_in_detail(instance=instance)
-        self.verify_md_proxy_logical_ports_on_backend()
+        self.deploy_mdproxy_topology()
+        ssh_client = self.verify_server_ssh(
+            server=self.topology_servers["server_mdproxy_1"])
+        self.verify_metadata_in_detail(
+            instance=self.topology_servers["server_mdproxy_1"],
+            ssh_client=ssh_client)
+        tenant_id = self.topology_networks["network_mdproxy"]["tenant_id"]
+        network_id= self.topology_networks["network_mdproxy"]["id"]
+        self.verify_md_proxy_logical_ports_on_backend(tenant_id, network_id)
 
     @decorators.idempotent_id("fce2acc8-b850-40fe-bf02-958dd3cd4343")
     @test.services("compute", "network")
     def test_mdproxy_with_server_on_two_ls(self):
-        router = self._create_router(
-            router_name=data_utils.rand_name("router-MDProxy"),
-            external_network_id=CONF.network.public_network_id)
-        (network_id1, subnet_id1) = self._create_net_subnet_router_interface(
-            router)
-        (network_id2, subnet_id2) = self._create_net_subnet_router_interface(
-            router)
-        net1 = {"uuid": network_id1}
-        net2 = {"uuid": network_id2}
-        instance, keypair = self._create_server_on_networks([net1, net2])
-        port_id = self._get_port_id(network_id1, subnet_id1, instance)
-        self.verify_ssh(keypair=keypair, instance=instance, port_id=port_id)
-        self.verify_metadata_in_detail(instance=instance)
+        router_mdproxy = self.create_topology_router("router_mdproxy")
+        network_mdproxy = self.create_topology_network("network_mdproxy")
+        self.create_topology_subnet("subnet_web", network_mdproxy,
+                                    router_id=router_mdproxy["id"])
+        network2_mdproxy = self.create_topology_network("network2_mdproxy")
+        self.create_topology_subnet("subnet2_web", network2_mdproxy,
+                                    router_id=router_mdproxy["id"])
+        self.create_topology_instance(
+            "server_mdproxy_1", [network_mdproxy, network2_mdproxy])
+        ssh_client = self.verify_server_ssh(
+            server=self.topology_servers["server_mdproxy_1"])
+        self.verify_metadata_in_detail(
+            instance=self.topology_servers["server_mdproxy_1"],
+            ssh_client=ssh_client)
 
     @decorators.idempotent_id("67332752-1295-42cb-a8c3-99210fb6b00b")
     @test.services("compute", "network")
@@ -268,7 +283,7 @@ class TestMDProxy(manager.NetworkScenarioTest):
         (network_id, _) = self._create_net_subnet_router_interface()
         networks_ids = {"uuid": network_id}
         self._create_server_on_networks([networks_ids])
-        self.verify_md_proxy_logical_ports_on_backend()
+        self.verify_md_proxy_logical_ports_on_backend(tenant_id, network_id)
 
     @decorators.idempotent_id("cc8d2ab8-0bea-4e32-bf80-c9c46a7612b7")
     @decorators.attr(type=["negative"])
