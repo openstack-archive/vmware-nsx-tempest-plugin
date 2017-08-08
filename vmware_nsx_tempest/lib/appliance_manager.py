@@ -45,6 +45,7 @@ class ApplianceManager(manager.NetworkScenarioTest):
         self.topology_config_drive = CONF.compute_feature_enabled.config_drive
         self.topology_keypairs = {}
         self.servers_details = {}
+        self.topology_port_ids = {}
 
     def get_internal_ips(self, server, network, device="network"):
         internal_ips = [p['fixed_ips'][0]['ip_address'] for p in
@@ -83,11 +84,15 @@ class ApplianceManager(manager.NetworkScenarioTest):
         return self.topology_keypairs[server['key_name']]['private_key']
 
     def create_topology_router(self, router_name, routers_client=None,
-                               **kwargs):
+                               tenant_id=None, **kwargs):
         if not routers_client:
             routers_client = self.routers_client
+        if not tenant_id:
+            tenant_id = routers_client.tenant_id
         router_name_ = constants.APPLIANCE_NAME_STARTS_WITH + router_name
-        router = self._create_router(namestart=router_name_, **kwargs)
+        name = data_utils.rand_name(router_name_)
+        router = routers_client.create_router(
+            name=name, admin_state_up=True, tenant_id=tenant_id)['router']
         public_network_info = {"external_gateway_info": dict(
             network_id=self.topology_public_network_id)}
         routers_client.update_router(router['id'], **public_network_info)
@@ -235,3 +240,20 @@ class ApplianceManager(manager.NetworkScenarioTest):
         self.servers_details[server_name] = server_details
         self.topology_servers[server_name] = server
         return server
+
+    def _list_ports(self, *args, **kwargs):
+        """List ports using admin creds """
+        ports_list = self.os_admin.ports_client.list_ports(
+            *args, **kwargs)
+        return ports_list['ports']
+
+    def get_network_ports_id(self):
+        for port in self._list_ports():
+            for fixed_ip in port["fixed_ips"]:
+                ip = fixed_ip["ip_address"]
+                port_id = port["id"]
+                tenant_id = port["tenant_id"]
+                if tenant_id in self.topology_port_ids:
+                    self.topology_port_ids[tenant_id][ip] = port_id
+                else:
+                    self.topology_port_ids[tenant_id] = {ip: port_id}
