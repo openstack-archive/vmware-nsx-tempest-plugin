@@ -149,9 +149,9 @@ class TestMicroSegmentationOps(feature_manager.FeatureManager):
             self.check_server_project_connectivity(details)
         self.check_cross_network_connectivity(
             self.topology_networks["network_web"],
-            self.servers_details["server_app_1"].floating_ip,
+            self.servers_details["server_app_1"].floating_ips[0],
             self.servers_details["server_app_1"].server)
         self.check_cross_network_connectivity(
             self.topology_networks["network_app"],
-            self.servers_details["server_web_1"].floating_ip,
+            self.servers_details["server_web_1"].floating_ips[0],
             self.servers_details["server_web_1"].server)
