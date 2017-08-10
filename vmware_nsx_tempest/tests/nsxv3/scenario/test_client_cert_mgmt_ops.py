@@ -328,20 +328,32 @@ class TestCertificateMgmtOps(TestCertificateMgmt):
 
     @decorators.attr(type='nsxv3')
     @decorators.idempotent_id('280cdcc6-5bd0-472c-a8a9-954dd612a0a6')
-    def test_port_modification_super_admin(self):
+    def test_super_admin_priveleges(self):
         """
-        Verify if super admin can override openstack entity
-        and delete openstack logical port
+        Create a qos policy
+        Verify if backend shows switching profile is created by openstack
+        Verify if NSX Super admin can delete the profile
         """
-        data = self.ca_topo()
-        self.assertEqual(data['_create_user'], self.openstack_tag,
-            'Incorrect tag for the create user')
-        #try to delete logical port as NSX admin
-        endpoint = ("/%s/%s" % ('logical-ports',
+        policy = self.create_qos_policy(name='test-qos-policy-cert-mgmt',
+                                        description='dscp_rule and bw_rule',
+                                        shared=False)
+        self.addCleanup(test_utils.call_and_ignore_notfound_exc,
+                        self.adm_qos_client.delete_policy, policy['id'])
+        #obtain all switching profiles at the backend
+        qos_policies = self.nsx.get_switching_profiles()
+        nsx_policy = self.nsx.get_nsx_resource_by_name(qos_policies,
+            policy['name'])
+        #check backend if the qos policy was created
+        msg = 'Qos policy %s not found' % policy['name']
+        self.assertIsNotNone(self.nsx.get_switching_profile(
+            nsx_policy['id']), msg)
+        data = self.nsx.get_switching_profile(nsx_policy['id'])
+        #try to delete qos policy as NSX admin
+        endpoint = ("/%s/%s" % ('switching-profiles',
             data['id']))
-        response = self.nsx.delete_super_admin(endpoint=endpoint)
+        response = self.nsx.delete_super_admin(endpoint)
         self.assertEqual(response.status_code, 200,
-            "Superadmin unable to delete the logical port")
+            "Superadmin unable to delete the qos switching profile")
 
     @decorators.attr(type='nsxv3')
     @decorators.idempotent_id('a874d78b-eb7a-4df6-a01b-dc0a22422dc2')
