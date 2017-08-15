@@ -98,3 +98,117 @@ class L2GatewayConnectionClient(base.BaseNetworkClient):
     def list_l2_gateway_connections(self, **filters):
         uri = self.resource_base_path
         return self.list_resources(uri, **filters)
+
+
+class QosBWLimitClient(base.BaseNetworkClient):
+    """
+    Request resources via API for QosBandwidthLimitClient
+        Qos bandwidth-limit create request
+        Qos bandwidth-limit update request
+        Qos bandwidth-limit show request
+        Qos bandwidth-limit delete request
+        Qos bandwidth-limit list all request
+    """
+    resource = 'bandwidth_limit_rule'
+    resource_plural = 'bandwidth_limit_rules'
+    path = 'qos/policies'
+    resource_base_path = '/%s/%%s/bandwidth_limit_rules' % path
+    resource_object_path = '/%s/%%s/bandwidth_limit_rules/%%s' % path
+
+    def create_bandwidth_limit_rule(self, policy_id, **kwargs):
+        uri = self.resource_base_path % policy_id
+        post_data = {self.resource: kwargs}
+        return self.create_resource(uri, post_data)
+
+    def update_bandwidth_limit_rule(self, rule_id, policy_id, **kwargs):
+        uri = self.resource_object_path % (policy_id, rule_id)
+        post_data = {self.resource: kwargs}
+        return self.update_resource(uri, post_data)
+
+    def show_bandwidth_limit_rule(self, rule_id, policy_id, **fields):
+        uri = self.resource_object_path % (policy_id, rule_id)
+        return self.show_resource(uri, **fields)
+
+    def delete_bandwidth_limit_rule(self, rule_id, policy_id):
+        uri = self.resource_object_path % (policy_id, rule_id)
+        return self.delete_resource(uri)
+
+    def list_bandwidth_limit_rules(self, policy_id, **filters):
+        uri = self.resource_base_path % policy_id
+        return self.list_resources(uri, **filters)
+
+
+class QosDscpClient(base.BaseNetworkClient):
+    """
+    Request resources via API for QosBandwidthLimitClient
+        Qos dscp-marking create request
+        Qos dscp-marking update request
+        Qos dscp-marking show request
+        Qos dscp-marking delete request
+        Qos dscp-marking list all request
+    """
+    resource = 'dscp_marking_rule'
+    resource_plural = 'dscp_marking_rules'
+    path = 'qos/policies'
+    resource_base_path = '/%s/%%s/dscp_marking_rules' % path
+    resource_object_path = '/%s/%%s/dscp_marking_rules/%%s' % path
+
+    def create_dscp_marking_rule(self, policy_id, **kwargs):
+        uri = self.resource_base_path % policy_id
+        post_data = {self.resource: kwargs}
+        return self.create_resource(uri, post_data)
+
+    def update_dscp_marking_rule(self, rule_id, policy_id, **kwargs):
+        uri = self.resource_object_path % (policy_id, rule_id)
+        post_data = {self.resource: kwargs}
+        return self.update_resource(uri, post_data)
+
+    def show_dscp_marking_rule(self, rule_id, policy_id, **fields):
+        uri = self.resource_object_path % (policy_id, rule_id)
+        return self.show_resource(uri, **fields)
+
+    def delete_dscp_marking_rule(self, rule_id, policy_id):
+        uri = self.resource_object_path % (policy_id, rule_id)
+        return self.delete_resource(uri)
+
+    def list_dscp_marking_rules(self, policy_id, **filters):
+        uri = self.resource_base_path % policy_id
+        return self.list_resources(uri, **filters)
+
+
+class QosPoliciesClient(base.BaseNetworkClient):
+    """
+    Request resources via API for QosPolicyClient
+        Qos policy create request
+        Qos policy update request
+        Qos policy show request
+        Qos policy delete request
+        Qos policy list all request
+    """
+    resource = 'policy'
+    resource_plural = 'policies'
+    path = 'qos/policies'
+    resource_base_path = '/%s' % path
+    resource_object_path = '/%s/%%s' % path
+
+    def create_policy(self, **kwargs):
+        uri = self.resource_base_path
+        post_data = {self.resource: kwargs}
+        return self.create_resource(uri, post_data)
+
+    def update_policy(self, policy_id, **kwargs):
+        uri = self.resource_object_path % policy_id
+        post_data = {self.resource: kwargs}
+        return self.update_resource(uri, post_data)
+
+    def show_policy(self, policy_id, **fields):
+        uri = self.resource_object_path % policy_id
+        return self.show_resource(uri, **fields)
+
+    def delete_policy(self, policy_id):
+        uri = self.resource_object_path % policy_id
+        return self.delete_resource(uri)
+
+    def list_policies(self, **filters):
+        uri = self.resource_base_path
+        return self.list_resources(uri, **filters)

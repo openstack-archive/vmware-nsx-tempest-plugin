@@ -22,6 +22,8 @@ from tempest.lib.common.utils import data_utils
 from tempest.lib.common.utils import test_utils
 from tempest.lib import exceptions as lib_exc
 
+from tempest.api.image import base
+
 from vmware_nsx_tempest.common import constants
 from vmware_nsx_tempest.tests.scenario import manager
 
@@ -29,7 +31,7 @@ CONF = config.CONF
 LOG = logging.getLogger(__name__)
 
 
-class ApplianceManager(manager.NetworkScenarioTest):
+class ApplianceManager(manager.NetworkScenarioTest, base.BaseV2ImageTest):
     server_details = collections.namedtuple('server_details',
                                             ['server', 'floating_ip',
                                              'networks'])
@@ -235,3 +237,12 @@ class ApplianceManager(manager.NetworkScenarioTest):
         self.servers_details[server_name] = server_details
         self.topology_servers[server_name] = server
         return server
+
+    def get_image_id(self, image_name):
+        """Return image id of already registered image
+        using image name
+        """
+        images = self.client.list_images()['images']
+        for item in images:
+            if item['name'] == image_name:
+                return item['id']

@@ -66,3 +66,44 @@ class TrafficManager(appliance_manager.ApplianceManager):
         self.check_server_internal_ips_using_floating_ip(
             floating_ip_on_network2, server_on_network2, remote_ips,
             should_connect)
+
+    def use_iperf_send_traffic(
+            self, src_server, dst_server, send_rate, traffic_type=None):
+        """To send iperf traffic between src server and dst server
+        for udp traffic specify -u option, default is tcp for iperf traffic
+        """
+        src_ip_address = src_server['floating_ip']['floating_ip_address']
+        src_private_key = self.get_server_key(src_server)
+        src_ssh_source = self.get_remote_client(src_ip_address,
+            private_key=src_private_key)
+        dst_ip_address = dst_server['floating_ip']['floating_ip_address']
+        dst_private_key = self.get_server_key(dst_server)
+        dst_ssh_source = self.get_remote_client(dst_ip_address,
+            private_key=dst_private_key)
+        # set up iperf server on destination VM
+        if traffic_type == 'udp':
+            cmd = ('iperf -p 49162 -s -u > /dev/null 2>&1 &')
+        else:
+            cmd = ('iperf -p 49162 -s  > /dev/null 2>&1 &')
+        dst_ssh_source.exec_command(cmd)
+        # set up iperf client on source VM
+        dst_internal_ip_address = dst_server['floating_ip']['fixed_ip_address']
+        if traffic_type == 'udp':
+            cmd = ('iperf -p 49162 -c %s -b %sM -t 1 -u | grep %%'
+                   % (unicode(dst_internal_ip_address), unicode(send_rate)))
+        else:
+            cmd = ('iperf -p 49162 -c %s -b %sM -t 1 | grep %%'
+                   % (unicode(dst_internal_ip_address), unicode(send_rate)))
+        output = src_ssh_source.exec_command(cmd)
+        bandwidth_value = output.split()[7]
+        # kill the iperf process on destination VM
+        cmd = ('ps -ef | grep iperf ')
+        output = dst_ssh_source.exec_command(cmd)
+        for line in output.splitlines():
+            if 'iperf -p 49162 -s -u' not in line:
+                continue
+            else:
+                iperf_process_id = line.split()[1]
+                cmd = ('kill %s' % (unicode(iperf_process_id)))
+                dst_ssh_source.exec_command(cmd)
+        return bandwidth_value
