@@ -44,3 +44,34 @@ class NSXClient(object):
         if self.backend == "nsxv3":
             return self.nsx.get_bridge_cluster_info(
                 *args, **kwargs)
+
+    def get_qos_switching_profile(self, policy_name):
+        """
+        Retrieve attributes of a given nsx switching profile
+        """
+        if self.backend == "nsxv3":
+            qos_policies = self.nsx.get_switching_profiles()
+            nsx_policy = self.nsx.get_nsx_resource_by_name(qos_policies,
+                policy_name)
+            qos_policy = self.nsx.get_switching_profile(nsx_policy['id'])
+            return qos_policy
+        else:
+            #TODO(dkandavarajay) define else for NSXV
+            pass
+
+    def get_qos_bandwidth_rule(self, nsx_policy_id):
+        """
+        Retrieve attributes of a given nsx qos bandwidth-rule
+        """
+        if self.backend == "nsxv3":
+            sw_profiles = self.nsx.get_switching_profile(nsx_policy_id)
+            shaper_cfg = sw_profiles['shaper_configuration']
+            for cfg in shaper_cfg:
+                if cfg['resource_type'] == 'IngressRateShaper':
+                    avg_bw = cfg['average_bandwidth_mbps']
+                    peak_bw = cfg['peak_bandwidth_mbps']
+                    max_burst = cfg['burst_size_bytes']
+                    return avg_bw, peak_bw, max_burst
+        else:
+            #TODO(dkandavarajay) define else for NSXV
+            pass
