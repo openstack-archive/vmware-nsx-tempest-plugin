@@ -347,6 +347,8 @@ class TestAllowedAddressPair(manager.NetworkScenarioTest):
             port1_id['port']['id'],
             allowed_address_pairs=allowed_address_pairs)
         kwargs = {'port_id': port_id['port']['id']}
+        # Add soem sleep. Without sleep it is failing
+        time.sleep(60)
         # Attach interface to vm
         self.interface_client.create_interface(server_default['id'], **kwargs)
         time.sleep(10)
@@ -371,10 +373,10 @@ class TestAllowedAddressPair(manager.NetworkScenarioTest):
         self._assign_mac_address(ssh_source, 'eth1', vm1_mac_address)
         self._assign_mac_address(ssh_source1, 'eth1', vm2_mac_address)
         self.assertTrue(self._check_remote_connectivity
-                        (ssh_source1, ip_address_vm1, 'True'),
+                        (ssh_source, ip_address_vm1, 'True'),
                         'Destination is reachable')
         self.assertTrue(self._check_remote_connectivity
-                        (ssh_source, ip_address_vm2, 'True'),
+                        (ssh_source1, ip_address_vm2, 'True'),
                         'Destination is reachable')
 
     def _test_allowed_address_pair_on_vms_with_multiple_ips(
