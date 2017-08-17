@@ -59,3 +59,8 @@ ICMP_PROTOCOL = 'icmp'
 NSX_FIREWALL_REALIZED_DELAY = 2
 
 APPLIANCE_NAME_STARTS_WITH = "vmw_"
+
+# Time interval
+TIME = {
+        "SEC" : {"SIXTY": 60}
+       }
