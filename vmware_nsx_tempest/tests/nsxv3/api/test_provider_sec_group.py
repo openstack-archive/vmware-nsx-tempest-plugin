@@ -235,6 +235,199 @@ class ProviderSecurityGroupTest(base.BaseAdminNetworkTest):
         port_client.update_port(port_id['port']['id'], **kwargs)
 
     @decorators.attr(type='nsxv3')
+    @decorators.idempotent_id('6271addb-0c60-4548-90f3-5002f4be1985')
+    def test_port_with_mac_learning_enabled_psg_and_psec_disabled(self):
+        self.create_security_provider_group(self.cmgr_adm,
+                                            provider=True)
+        net_client = self.cmgr_adm.networks_client
+        body = {'name': 'provider-network'}
+        network = net_client.create_network(**body)
+        self.addCleanup(test_utils.call_and_ignore_notfound_exc,
+                        net_client.delete_network,
+                        network['network']['id'])
+        body = {"network_id": network['network']['id'],
+                "allocation_pools": [{"start": "2.0.0.2",
+                                      "end": "2.0.0.254"}],
+                "ip_version": 4, "cidr": "2.0.0.0/24"}
+        subnet_client = self.cmgr_adm.subnets_client
+        subnet_client.create_subnet(**body)
+        body = {"network_id": network['network']['id'],
+                "port_security_enabled": "False",
+                "security_groups": [],
+                "mac_learning_enabled": "True"}
+        port_client = self.cmgr_adm.ports_client
+        port_id = port_client.create_port(**body)
+        self.addCleanup(test_utils.call_and_ignore_notfound_exc,
+                        port_client.delete_port,
+                        port_id['port']['id'])
+        self.assertEqual(port_id['port']['provider_security_groups'], [])
+        self.assertEqual(port_id['port']['security_groups'], [])
+        self.assertEqual(port_id['port']['mac_learning_enabled'], True)
+
+    @decorators.attr(type='nsxv3')
+    @decorators.idempotent_id('3eaf45af-4505-4dbb-a26f-70bb2d56e2da')
+    def test_port_with_mac_learning_psg_and_psec_enabled_disabled(self):
+        sg = self.create_security_provider_group(self.cmgr_adm,
+                                                 provider=True)
+        sg_id = sg.get('id')
+        net_client = self.cmgr_adm.networks_client
+        body = {'name': 'provider-network'}
+        network = net_client.create_network(**body)
+        self.addCleanup(test_utils.call_and_ignore_notfound_exc,
+                        net_client.delete_network,
+                        network['network']['id'])
+        body = {"network_id": network['network']['id'],
+                "allocation_pools": [{"start": "2.0.0.2",
+                                      "end": "2.0.0.254"}],
+                "ip_version": 4, "cidr": "2.0.0.0/24"}
+        subnet_client = self.cmgr_adm.subnets_client
+        subnet_client.create_subnet(**body)
+        body = {"network_id": network['network']['id']}
+        port_client = self.cmgr_adm.ports_client
+        port_id = port_client.create_port(**body)
+        self.addCleanup(test_utils.call_and_ignore_notfound_exc,
+                        port_client.delete_port,
+                        port_id['port']['id'])
+        sec_group = port_id['port']['security_groups'][0]
+        body = {"port_security_enabled": "True",
+                "security_groups": [sec_group],
+                "mac_learning_enabled": "False"}
+        port_id = port_client.update_port(port_id['port']['id'], **body)
+        self.assertEqual(port_id['port']['provider_security_groups'], [sg_id])
+        self.assertEqual(port_id['port']['security_groups'], [sec_group])
+        body = {"port_security_enabled": "false",
+                "security_groups": [],
+                "provider_security_groups": [],
+                "mac_learning_enabled": "True"}
+        port_client = self.cmgr_adm.ports_client
+        port_id = port_client.update_port(port_id['port']['id'], **body)
+        self.assertEqual(port_id['port']['provider_security_groups'], [])
+        self.assertEqual(port_id['port']['security_groups'], [])
+        self.assertEqual(port_id['port']['mac_learning_enabled'], True)
+
+    @decorators.attr(type='nsxv3')
+    @decorators.idempotent_id('c99fe3e9-0d05-4e65-8495-34e8ba534459')
+    def test_port_with_mac_learning_enabled_disabled_with_psec_psg(self):
+        self.create_security_provider_group(self.cmgr_adm,
+                                            provider=True)
+        net_client = self.cmgr_adm.networks_client
+        body = {'name': 'provider-network',
+                'port_security_enabled': 'false'}
+        network = net_client.create_network(**body)
+        self.addCleanup(test_utils.call_and_ignore_notfound_exc,
+                        net_client.delete_network,
+                        network['network']['id'])
+        body = {"network_id": network['network']['id'],
+                "allocation_pools": [{"start": "2.0.0.2",
+                                      "end": "2.0.0.254"}],
+                "ip_version": 4, "cidr": "2.0.0.0/24"}
+        subnet_client = self.cmgr_adm.subnets_client
+        subnet_client.create_subnet(**body)
+        body = {"network_id": network['network']['id'],
+                "mac_learning_enabled": "True"}
+        port_client = self.cmgr_adm.ports_client
+        port_id = port_client.create_port(**body)
+        self.addCleanup(test_utils.call_and_ignore_notfound_exc,
+                        port_client.delete_port,
+                        port_id['port']['id'])
+        self.assertEqual(port_id['port']['provider_security_groups'], [])
+        self.assertEqual(port_id['port']['mac_learning_enabled'], True)
+        kwargs = {"mac_learning_enabled": "False"}
+        port_client.update_port(port_id['port']['id'], **kwargs)
+        kwargs = {"mac_learning_enabled": "True"}
+        port_client.update_port(port_id['port']['id'], **kwargs)
+        self.assertEqual(port_id['port']['mac_learning_enabled'], True)
+
+    @decorators.attr(type='nsxv3')
+    @decorators.idempotent_id('d521dd57-66dd-4541-b37d-95cbdf68ae82')
+    def test_psg_with_psec_disabled_on_net(self):
+        self.create_security_provider_group(self.cmgr_adm,
+                                            provider=True)
+        net_client = self.cmgr_adm.networks_client
+        body = {'name': 'provider-network', 'port_security_enabled': 'false'}
+        network = net_client.create_network(**body)
+        self.addCleanup(test_utils.call_and_ignore_notfound_exc,
+                        net_client.delete_network,
+                        network['network']['id'])
+        body = {"network_id": network['network']['id'],
+                "allocation_pools": [{"start": "2.0.0.2",
+                                      "end": "2.0.0.254"}],
+                "ip_version": 4, "cidr": "2.0.0.0/24"}
+        subnet_client = self.cmgr_adm.subnets_client
+        subnet_client.create_subnet(**body)
+        body = {"network_id": network['network']['id'],
+                "provider_security_groups": []}
+        port_client = self.cmgr_adm.ports_client
+        port_id = port_client.create_port(**body)
+        self.addCleanup(test_utils.call_and_ignore_notfound_exc,
+                        port_client.delete_port,
+                        port_id['port']['id'])
+        self.assertEqual(port_id['port']['provider_security_groups'], [])
+
+    @decorators.attr(type='nsxv3')
+    @decorators.idempotent_id('f261e83e-bc3c-4f8c-9b01-cdf86e98cdc8')
+    def test_psg_with_psec_disabled_on_net_psg_enabled_on_port(self):
+        sg = self.create_security_provider_group(self.cmgr_adm,
+                                                 provider=True)
+        sg_id = sg.get('id')
+        net_client = self.cmgr_adm.networks_client
+        body = {'name': 'provider-network',
+                'port_security_enabled': 'false'}
+        network = net_client.create_network(**body)
+        self.addCleanup(test_utils.call_and_ignore_notfound_exc,
+                        net_client.delete_network,
+                        network['network']['id'])
+        body = {"network_id": network['network']['id'],
+                "allocation_pools": [{"start": "2.0.0.2",
+                                      "end": "2.0.0.254"}],
+                "ip_version": 4, "cidr": "2.0.0.0/24"}
+        subnet_client = self.cmgr_adm.subnets_client
+        subnet_client.create_subnet(**body)
+        body = {"network_id": network['network']['id']}
+        port_client = self.cmgr_adm.ports_client
+        port_id = port_client.create_port(**body)
+        self.addCleanup(test_utils.call_and_ignore_notfound_exc,
+                        port_client.delete_port,
+                        port_id['port']['id'])
+        self.assertEqual(port_id['port']['provider_security_groups'], [])
+        body = {"provider_security_groups": ["%s" % sg_id]}
+        self.assertRaises(exceptions.BadRequest,
+                          port_client.update_port, port_id['port']['id'],
+                          **body)
+
+    @decorators.attr(type='nsxv3')
+    @decorators.idempotent_id('f3316650-0725-481b-9140-9a21cc4f0cd6')
+    def test_psg_updated_port_level_when_psec_disabled_on_port(self):
+        net_client = self.cmgr_adm.networks_client
+        body = {'name': 'provider-network'}
+        network = net_client.create_network(**body)
+        self.addCleanup(test_utils.call_and_ignore_notfound_exc,
+                        net_client.delete_network,
+                        network['network']['id'])
+        body = {"network_id": network['network']['id'],
+                "allocation_pools": [{"start": "2.0.0.2",
+                                      "end": "2.0.0.254"}],
+                "ip_version": 4, "cidr": "2.0.0.0/24"}
+        subnet_client = self.cmgr_adm.subnets_client
+        subnet_client.create_subnet(**body)
+        body = {"network_id": network['network']['id'],
+                "admin_state_up": 'true'}
+        port_client = self.cmgr_adm.ports_client
+        port_id = port_client.create_port(**body)
+        self.addCleanup(test_utils.call_and_ignore_notfound_exc,
+                        port_client.delete_port,
+                        port_id['port']['id'])
+        sg = self.create_security_provider_group(self.cmgr_adm,
+                                                 provider=True)
+        kwargs = {"port_security_enabled": 'false', "security_groups": []}
+        port_client.update_port(port_id['port']['id'], **kwargs)
+        sg_id = sg.get('id')
+        body = {"provider_security_groups": ["%s" % sg_id]}
+        self.assertRaises(exceptions.BadRequest,
+                          port_client.update_port, port_id['port']['id'],
+                          **body)
+
+    @decorators.attr(type='nsxv3')
     @decorators.idempotent_id('2c44a134-f013-46b7-a2ec-14c7c38a4d8c')
     def test_multiple_provider_security_group_only_on_newton(self):
         sg = self.create_security_provider_group(self.cmgr_adm, provider=True)
@@ -337,7 +530,7 @@ class ProviderSecurityGroupTest(base.BaseAdminNetworkTest):
             # we create provider security group for other tests,
             # NSX will return all provider security group from DFW.
             if PROVIDER_SECURITY_GRP in section['display_name'] and \
-                            provider_sg_name not in section['display_name']:
+                    provider_sg_name not in section['display_name']:
                 pass
             else:
                 # check the sec name
