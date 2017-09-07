@@ -64,3 +64,7 @@ APPLIANCE_NAME_STARTS_WITH = "vmw_"
 TIME = {
         "SEC": {"SIXTY": 60}
        }
+
+VLAN_TYPE = 'vlan'
+VXLAN_TYPE = 'geneve'
+VLAN = 1001
