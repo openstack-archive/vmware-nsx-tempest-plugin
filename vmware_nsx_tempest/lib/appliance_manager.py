@@ -275,11 +275,18 @@ class ApplianceManager(manager.NetworkScenarioTest):
         if create_floating_ip:
             ports = self._get_server_portid_and_ip4(server)
             for port_id, ip4 in ports:
-                floating_ip = self.create_floatingip(server, port_id, ip4=ip4)
-                if server.get("floating_ips"):
-                    server["floating_ips"].append(floating_ip)
+                if clients is None:
+                    floating_ip = self.create_floatingip(server, port_id,
+                                                         ip4=ip4)
                 else:
-                    server["floating_ips"] = [floating_ip]
+                    floating_ip = self.\
+                        create_floatingip(server,
+                                          port_id, ip4=ip4,
+                                          client=clients.floating_ips_client)
+                    if server.get("floating_ips"):
+                        server["floating_ips"].append(floating_ip)
+                    else:
+                        server["floating_ips"] = [floating_ip]
                 self.topology_servers_floating_ip.append(floating_ip)
                 floating_ips.append(floating_ip)
         server_details = self.server_details(server=server,
