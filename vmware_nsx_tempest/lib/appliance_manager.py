@@ -38,6 +38,7 @@ class ApplianceManager(manager.NetworkScenarioTest):
         super(ApplianceManager, self).setUp()
         self.topology_routers = {}
         self.topology_networks = {}
+        self.topology_ports = {}
         self.topology_subnets = {}
         self.topology_servers = {}
         self.topology_servers_floating_ip = []
@@ -117,6 +118,30 @@ class ApplianceManager(manager.NetworkScenarioTest):
         self.topology_networks[network_name] = network
         return network
 
+    def create_topology_port(self, port_name, network, router_id=None,
+                             ports_client=None, routers_client=None,
+                             **kwargs):
+        port_name_ = constants.APPLIANCE_NAME_STARTS_WITH + port_name
+        if not ports_client:
+            ports_client = self.ports_client
+        if not routers_client:
+            routers_client = self.routers_client
+        port = dict(name=data_utils.rand_name(port_name_),
+                    network_id=network['id'], **kwargs)
+        port_result = ports_client.create_port(**port)
+        port = port_result['port']
+        self.addCleanup(test_utils.call_and_ignore_notfound_exc,
+                        ports_client.delete_port, port['id'])
+        self.topology_ports[port_name] = port
+        if router_id:
+            routers_client.add_router_interface(
+                router_id, port_id=port["id"])
+            self.addCleanup(
+                test_utils.call_and_ignore_notfound_exc,
+                routers_client.remove_router_interface, router_id,
+                port_id=port["id"])
+        return port
+
     def create_topology_subnet(
             self, subnet_name, network, routers_client=None,
             subnets_client=None, router_id=None, ip_version=4, cidr=None,
@@ -165,6 +190,7 @@ class ApplianceManager(manager.NetworkScenarioTest):
         try:
             result = None
             result = subnets_client.create_subnet(**subnet)
+
         except lib_exc.Conflict as e:
             is_overlapping_cidr = 'overlaps with another subnet' in str(e)
             if not is_overlapping_cidr:
@@ -206,7 +232,10 @@ class ApplianceManager(manager.NetworkScenarioTest):
         else:
             kwargs["config_drive"] = config_drive
         if not keypair:
-            keypair = self.create_keypair()
+            if clients is None:
+                keypair = self.create_keypair()
+            else:
+                keypair = self.create_keypair(clients.keypairs_client)
             self.topology_keypairs[keypair['name']] = keypair
             kwargs["key_name"] = keypair['name']
         else:
@@ -224,7 +253,12 @@ class ApplianceManager(manager.NetworkScenarioTest):
         server = self.create_server(
             name=server_name_, networks=networks_, clients=clients, **kwargs)
         if create_floating_ip:
-            floating_ip = self.create_floating_ip(server)
+            if clients is None:
+                floating_ip = self.create_floating_ip(server)
+            else:
+                floating_ip = \
+                    self.create_floating_ip(server,
+                                            client=clients.floating_ips_client)
             server["floating_ip"] = floating_ip
             self.topology_servers_floating_ip.append(floating_ip)
         else:
