@@ -22,6 +22,7 @@ from tempest.lib.common.utils import data_utils
 from tempest.lib.common.utils import test_utils
 from tempest.lib import decorators
 
+from vmware_nsx_tempest.common import constants
 from vmware_nsx_tempest.services import nsxv3_client
 from vmware_nsx_tempest.tests.scenario import manager
 
@@ -347,6 +348,8 @@ class TestAllowedAddressPair(manager.NetworkScenarioTest):
             port1_id['port']['id'],
             allowed_address_pairs=allowed_address_pairs)
         kwargs = {'port_id': port_id['port']['id']}
+        # Add some sleep. Without sleep it is failing
+        time.sleep(constants.TIME["SEC"]["SIXTY"])
         # Attach interface to vm
         self.interface_client.create_interface(server_default['id'], **kwargs)
         time.sleep(10)
@@ -360,21 +363,21 @@ class TestAllowedAddressPair(manager.NetworkScenarioTest):
         self.addCleanup(test_utils.call_and_ignore_notfound_exc,
                         self.interface_client.delete_interface,
                         server_default1['id'], port1_id['port']['id'])
-        ssh_source = self.get_remote_client(ip_address_default_vm,
+        ssh_source1 = self.get_remote_client(ip_address_default_vm,
                                             private_key=private_key_default_vm)
-        ssh_source1 = self.get_remote_client(
+        ssh_source2 = self.get_remote_client(
             ip_address_default1_vm,
             private_key=private_key_default1_vm)
         # Attach allowed pair ip's to vm's
-        self._assign_ip_address(ssh_source, 'eth1', ip_address_vm1)
-        self._assign_ip_address(ssh_source1, 'eth1', ip_address_vm2)
-        self._assign_mac_address(ssh_source, 'eth1', vm1_mac_address)
-        self._assign_mac_address(ssh_source1, 'eth1', vm2_mac_address)
+        self._assign_ip_address(ssh_source1, 'eth1', ip_address_vm1)
+        self._assign_ip_address(ssh_source2, 'eth1', ip_address_vm2)
+        self._assign_mac_address(ssh_source1, 'eth1', vm1_mac_address)
+        self._assign_mac_address(ssh_source2, 'eth1', vm2_mac_address)
         self.assertTrue(self._check_remote_connectivity
                         (ssh_source1, ip_address_vm1, 'True'),
                         'Destination is reachable')
         self.assertTrue(self._check_remote_connectivity
-                        (ssh_source, ip_address_vm2, 'True'),
+                        (ssh_source2, ip_address_vm2, 'True'),
                         'Destination is reachable')
 
     def _test_allowed_address_pair_on_vms_with_multiple_ips(
