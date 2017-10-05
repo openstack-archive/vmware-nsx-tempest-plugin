@@ -14,13 +14,20 @@
 #    under the License.
 
 from tempest import config
+from tempest.lib.common.utils import data_utils
 from tempest.lib.common.utils import test_utils
 
 from vmware_nsx_tempest._i18n import _
 from vmware_nsx_tempest.common import constants
 from vmware_nsx_tempest.lib import traffic_manager
+from vmware_nsx_tempest.services.lbaas import health_monitors_client
+from vmware_nsx_tempest.services.lbaas import listeners_client
+from vmware_nsx_tempest.services.lbaas import load_balancers_client
+from vmware_nsx_tempest.services.lbaas import members_client
+from vmware_nsx_tempest.services.lbaas import pools_client
 from vmware_nsx_tempest.services import nsx_client
 from vmware_nsx_tempest.services import openstack_network_clients
+
 
 LOG = constants.log.getLogger(__name__)
 
@@ -61,6 +68,13 @@ class FeatureManager(traffic_manager.TrafficManager):
             net_client.region,
             net_client.endpoint_type,
             **_params)
+        cls.load_balancers_client = \
+            load_balancers_client.get_client(cls.manager)
+        cls.listeners_client = listeners_client.get_client(cls.manager)
+        cls.pools_client = pools_client.get_client(cls.manager)
+        cls.members_client = members_client.get_client(cls.manager)
+        cls.health_monitors_client = \
+            health_monitors_client.get_client(cls.manager)
 
     #
     # L2Gateway base class. To get basics of L2GW.
@@ -170,3 +184,215 @@ class FeatureManager(traffic_manager.TrafficManager):
         rsp = self.l2gwc_client.delete_l2_gateway_connection(l2gwc_id)
         LOG.info("response : %(rsp)s", {"rsp": rsp})
         return rsp
+
+    #
+    # LBAAS section.
+    #
+    def delete_loadbalancer_resources(self, lb_id):
+        """Deletion of lbaas resources.
+
+        :param lb_id: Load Balancer ID.
+
+        """
+        lb_client = self.load_balancers_client
+        statuses = lb_client.show_load_balancer_status_tree(lb_id)
+        statuses = statuses.get('statuses', statuses)
+        lb = statuses.get('loadbalancer')
+        for listener in lb.get('listeners', []):
+            for policy in listener.get('l7policies'):
+                test_utils.call_and_ignore_notfound_exc(
+                    self.l7policies_client.delete_policy,
+                    policy.get('id'))
+            for pool in listener.get('pools'):
+                self.delete_lb_pool_resources(lb_id, pool)
+            test_utils.call_and_ignore_notfound_exc(
+                self.listeners_client.delete_listener,
+                listener.get('id'))
+            self.wait_for_load_balancer_status(lb_id)
+        # delete pools not attached to listener, but loadbalancer
+        for pool in lb.get('pools', []):
+            self.delete_lb_pool_resources(lb_id, pool)
+        test_utils.call_and_ignore_notfound_exc(
+            lb_client.delete_load_balancer, lb_id)
+        self.load_balancers_client.wait_for_load_balancer_status(
+            lb_id, is_delete_op=True)
+        lbs = lb_client.list_load_balancers()['loadbalancers']
+        self.assertEqual(0, len(lbs))
+
+    def delete_lb_pool_resources(self, lb_id, pool):
+        """Deletion of lbaas pool resources.
+
+        :param lb_id: Load Balancer ID.
+        :param pool: pool information.
+
+        """
+        pool_id = pool.get('id')
+        hm = pool.get('healthmonitor')
+        if hm:
+            test_utils.call_and_ignore_notfound_exc(
+                self.health_monitors_client.delete_health_monitor,
+                pool.get('healthmonitor').get('id'))
+            self.wait_for_load_balancer_status(lb_id)
+        test_utils.call_and_ignore_notfound_exc(
+            self.pools_client.delete_pool, pool.get('id'))
+        self.wait_for_load_balancer_status(lb_id)
+        for member in pool.get('members', []):
+            test_utils.call_and_ignore_notfound_exc(
+                self.members_client.delete_member,
+                pool_id, member.get('id'))
+            self.wait_for_load_balancer_status(lb_id)
+
+    def start_web_servers(self, protocol_port):
+        """Start web server.
+
+        :param protocol_port: Port number.
+
+        """
+        for server_name in self.topology_servers.keys():
+            server = self.servers_details[server_name].server
+            self.start_web_server(protocol_port, server, server_name)
+
+    def wait_for_load_balancer_status(self, lb_id):
+        # Wait for load balancer become ONLINE and ACTIVE
+        self.load_balancers_client.wait_for_load_balancer_status(lb_id)
+
+    def create_addtional_lbaas_members(self, protocol_port):
+        """Create Additional members in pool.
+
+        :param protocol_port: Port number.
+
+        """
+        for server_name in self.topology_servers.keys():
+            if server_name in self.server_names:
+                continue
+            fip_data = self.servers_details[server_name].floating_ips[0]
+            fixed_ip_address = fip_data['fixed_ip_address']
+            self._disassociate_floating_ip(fip_data)
+            pool_id = self.pool['id']
+            vip_subnet_id = self.topology_subnets["subnet_lbaas_1"]['id']
+            lb_id = self.loadbalancer['id']
+            self.members_client.create_member(
+                pool_id, subnet_id=vip_subnet_id,
+                address=fixed_ip_address,
+                protocol_port=protocol_port)
+            self.wait_for_load_balancer_status(lb_id)
+
+    def check_lbaas_project_least_connections(self, no_vms):
+        vip = self.vip_ip_address
+        for count in range(1, 10):
+            self.do_http_request(vip=vip, send_counts=self.poke_counters)
+        # ROUND_ROUBIN, so equal counts
+        no_of_vms = len(self.http_cnt)
+        self.assertEqual(no_vms, no_of_vms)
+
+    def check_lbaas_project_weight_values(self, count=2):
+        vip = self.vip_ip_address
+        self.do_http_request(vip=vip, send_counts=self.poke_counters)
+        # ROUND_ROUBIN, so equal counts
+        no_of_vms = len(self.http_cnt)
+        if no_of_vms:
+            if (self.http_cnt['server_lbaas_0'] <
+                    (self.poke_counters / no_of_vms)):
+                self.assertGreater(self.http_cnt['server_lbaas_1'],
+                                   self.poke_counters / no_of_vms)
+            elif (self.http_cnt['server_lbaas_0'] >
+                  (self.poke_counters / no_of_vms)):
+                self.assertLess(self.http_cnt['server_lbaas_1'],
+                                self.poke_counters / no_of_vms)
+            else:
+                self.assertEqual(self.http_cnt['server_lbaas_1'],
+                                 self.poke_counters / no_of_vms,
+                                 "LB fails with weighted values")
+
+    def check_project_lbaas(self, count=2):
+        i = 0
+        vip = self.vip_ip_address
+        self.do_http_request(vip=vip, send_counts=self.poke_counters)
+        # ROUND_ROUBIN, so equal counts
+        no_of_vms = len(self.http_cnt)
+        for server_name in self.topology_servers.keys():
+            if i < count:
+                i += 1
+                self.assertEqual(self.poke_counters / no_of_vms,
+                                 self.http_cnt[server_name])
+            else:
+                break
+
+    def count_response(self, response):
+        if response in self.http_cnt:
+            self.http_cnt[response] += 1
+        else:
+            self.http_cnt[response] = 1
+
+    def update_members_weight(self, weight):
+        for server in self.members:
+            self.members_client.update_member(
+                self.pool['id'], server['member']['id'], weight=weight)
+            weight += weight
+
+    def update_pool_algorithm(self, algo):
+        self.pools_client.update_pool(self.pool['id'],
+                                      lb_algorithm=algo)
+
+    def create_project_lbaas(self, protocol_type, protocol_port, lb_algorithm,
+                             hm_type, member_count=2, max_vms=None,
+                             weight=None):
+        count = 0
+        vip_subnet_id = self.topology_subnets["subnet_lbaas_1"]['id']
+        lb_name = data_utils.rand_name(self.namestart)
+        self.loadbalancer = self.load_balancers_client.create_load_balancer(
+            name=lb_name, vip_subnet_id=vip_subnet_id)['loadbalancer']
+        lb_id = self.loadbalancer['id']
+        self.wait_for_load_balancer_status(lb_id)
+
+        self.listener = self.listeners_client.create_listener(
+            loadbalancer_id=lb_id, protocol=protocol_type,
+            protocol_port=protocol_port, name=lb_name)['listener']
+        self.wait_for_load_balancer_status(lb_id)
+
+        self.pool = self.pools_client.create_pool(
+            listener_id=self.listener['id'],
+            lb_algorithm=lb_algorithm, protocol=protocol_type,
+            name=lb_name)['pool']
+        self.wait_for_load_balancer_status(lb_id)
+        pool_id = self.pool['id']
+
+        self.healthmonitor = (
+            self.health_monitors_client.create_health_monitor(
+                pool_id=pool_id, type=hm_type,
+                delay=self.hm_delay, max_retries=self.hm_max_retries,
+                timeout=self.hm_timeout))
+        self.wait_for_load_balancer_status(lb_id)
+        self.members = []
+        for server_name in self.topology_servers.keys():
+            if count < member_count:
+                fip_data = self.servers_details[server_name].floating_ips[0]
+                fixed_ip_address = fip_data['fixed_ip_address']
+                self._disassociate_floating_ip(fip_data)
+                if weight:
+                    weight += count
+                    member = self.members_client.create_member(
+                        pool_id, subnet_id=vip_subnet_id,
+                        address=fixed_ip_address,
+                        protocol_port=protocol_port,
+                        weight=weight)
+                else:
+                    member = self.members_client.create_member(
+                        pool_id, subnet_id=vip_subnet_id,
+                        address=fixed_ip_address,
+                        protocol_port=protocol_port)
+                self.wait_for_load_balancer_status(lb_id)
+                self.members.append(member)
+                self.server_names.append(server_name)
+                count += 1
+            else:
+                break
+        self.ports_client.update_port(
+            self.loadbalancer['vip_port_id'],
+            security_groups=[self.sg['id']])
+        # create lbaas public interface
+        vip_fip = \
+            self.create_floatingip(self.loadbalancer,
+                                   port_id=self.loadbalancer['vip_port_id'])
+        self.vip_ip_address = vip_fip['floating_ip_address']
+        return self.vip_ip_address

@@ -332,5 +332,6 @@ class ApplianceManager(manager.NetworkScenarioTest):
                     break
             else:
                 image_id = image["id"]
+                break
         self.assertIsNotNone(image_id, msg)
         return image_id
