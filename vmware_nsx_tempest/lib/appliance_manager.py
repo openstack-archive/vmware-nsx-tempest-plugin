@@ -320,6 +320,7 @@ class ApplianceManager(manager.NetworkScenarioTest):
         :param params: List of sub-string of image name
         :return:
         """
+        found = 0
         # Retrieve the list of images that meet the filter
         images_list = self.os_admin.image_client_v2.list_images()['images']
         # Validate that the list was fetched sorted accordingly
@@ -332,5 +333,8 @@ class ApplianceManager(manager.NetworkScenarioTest):
                     break
             else:
                 image_id = image["id"]
+                found = 1
+            if found == 1:
+                break
         self.assertIsNotNone(image_id, msg)
         return image_id
