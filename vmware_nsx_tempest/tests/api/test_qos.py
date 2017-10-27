@@ -540,7 +540,7 @@ class QosPolicyTest(BaseQosTest):
         self.addCleanup(test_utils.call_and_ignore_notfound_exc,
                         self.adm_qos_client.delete_policy, policy['id'])
         self.adm_qos_client.create_bandwidth_limit_rule(
-            policy['id'], 200, 1337)
+            policy['id'], 2000, 1337)
 
         self.adm_qos_client.delete_policy(policy['id'])
 
@@ -561,13 +561,13 @@ class QosBandwidthLimitRuleTest(BaseQosTest):
         self.addCleanup(test_utils.call_and_ignore_notfound_exc,
                         self.adm_qos_client.delete_policy, policy['id'])
         rule = self.create_qos_bandwidth_limit_rule(
-            policy_id=policy['id'], max_kbps=200, max_burst_kbps=1337)
+            policy_id=policy['id'], max_kbps=2000, max_burst_kbps=1337)
 
         # Test 'show rule'
         retrieved_rule = qos_client.show_bandwidth_limit_rule(
             rule['id'], policy['id'])
         self.assertEqual(rule['id'], retrieved_rule['id'])
-        self.assertEqual(200, retrieved_rule['max_kbps'])
+        self.assertEqual(2000, retrieved_rule['max_kbps'])
         self.assertEqual(1337, retrieved_rule['max_burst_kbps'])
 
         # Test 'list rules'
@@ -593,18 +593,18 @@ class QosBandwidthLimitRuleTest(BaseQosTest):
         self.addCleanup(test_utils.call_and_ignore_notfound_exc,
                         self.adm_qos_client.delete_policy, policy['id'])
         self.create_qos_bandwidth_limit_rule(
-            policy_id=policy['id'], max_kbps=200, max_burst_kbps=1337)
+            policy_id=policy['id'], max_kbps=2000, max_burst_kbps=1337)
 
         self.assertRaises(exceptions.Conflict,
                           self.create_qos_bandwidth_limit_rule,
                           policy_id=policy['id'],
-                          max_kbps=201, max_burst_kbps=1338)
+                          max_kbps=2001, max_burst_kbps=1338)
 
     @decorators.idempotent_id('149a6988-2568-47d2-931e-2dbc858943b3')
     def test_rule_update(self):
         """qos-bandwidth-limit-rule-update RULE-ID POLICY_ID."""
         qos_client = self.adm_qos_client
-        max_kbps = 200
+        max_kbps = 2000
         max_burst_kbps = 1337
         policy = self.create_qos_policy(name='test-policy',
                                         description='test policy',
@@ -612,7 +612,7 @@ class QosBandwidthLimitRuleTest(BaseQosTest):
         self.addCleanup(test_utils.call_and_ignore_notfound_exc,
                         self.adm_qos_client.delete_policy, policy['id'])
         rule = self.create_qos_bandwidth_limit_rule(
-            policy_id=policy['id'], max_kbps=1, max_burst_kbps=1)
+            policy_id=policy['id'], max_kbps=2000, max_burst_kbps=1000)
 
         qos_client.update_bandwidth_limit_rule(
             rule['id'], policy['id'],
@@ -627,7 +627,7 @@ class QosBandwidthLimitRuleTest(BaseQosTest):
     def test_rule_delete(self):
         """qos-bandwidth-limit-rule-delete RULE-ID POLICY_ID."""
         qos_client = self.adm_qos_client
-        max_kbps = 200
+        max_kbps = 2000
         max_burst_kbps = 1337
         policy = self.create_qos_policy(name='test-policy',
                                         description='test policy',
@@ -686,7 +686,7 @@ class QosBandwidthLimitRuleTest(BaseQosTest):
         self.addCleanup(test_utils.call_and_ignore_notfound_exc,
                         self.adm_qos_client.delete_policy, policy1['id'])
         rule1 = self.create_qos_bandwidth_limit_rule(
-            policy_id=policy1['id'], max_kbps=200, max_burst_kbps=1337)
+            policy_id=policy1['id'], max_kbps=2000, max_burst_kbps=1337)
 
         policy2 = self.create_qos_policy(name='test-policy2',
                                          description='test policy2',
