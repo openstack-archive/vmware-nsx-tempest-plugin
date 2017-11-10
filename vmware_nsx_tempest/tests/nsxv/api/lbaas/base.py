@@ -88,7 +88,9 @@ class BaseTestCase(base.BaseNetworkTest):
         cls.subnet_id = cls.subnet.get('id')
         # NSX-v: load-balancer's subnet need to attach to exclusive-router
         if CONF.network.backend == "nsxv3":
-            router_cfg = dict(router_name=router_name)
+            router_cfg = dict(
+                router_name=router_name,
+                external_network_id=CONF.network.public_network_id)
         else:
             router_cfg = dict(router_name=router_name, router_type='exclusive')
             if NO_ROUTER_TYPE:
