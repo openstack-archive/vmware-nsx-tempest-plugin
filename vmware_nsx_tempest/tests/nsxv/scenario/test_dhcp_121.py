@@ -279,7 +279,7 @@ class TestDHCP121BasicOps(dmgr.TopoDeployScenarioManager):
             name=t_network['name'])
         self.check_server_connected(t_serv1)
         t_floatingip = self.create_floatingip_for_server(
-            t_serv1, client_mgr=self.admin_manager)
+            t_serv1, client_mgr=self.os_admin)
         msg = ("Associate t_floatingip[%s] to server[%s]"
                % (t_floatingip, t_serv1['name']))
         self._check_floatingip_connectivity(

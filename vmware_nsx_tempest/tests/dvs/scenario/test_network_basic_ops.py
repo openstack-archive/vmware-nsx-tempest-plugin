@@ -40,8 +40,8 @@ class TestDvsNetworkBasicOps(manager.NetworkScenarioTest):
         self._ip_version = 4
         self.keypairs = {}
         self.servers = []
-        self.admin_net_client = self.admin_manager.networks_client
-        self.admin_subnet_client = self.admin_manager.subnets_client
+        self.admin_net_client = self.os_admin.networks_client
+        self.admin_subnet_client = self.os_admin.subnets_client
 
     def _setup_network(self):
         self.network = self._create_network()
@@ -49,7 +49,7 @@ class TestDvsNetworkBasicOps(manager.NetworkScenarioTest):
 
     def _list_ports(self, *args, **kwargs):
         """List ports using admin creds """
-        ports_list = self.admin_manager.ports_client.list_ports(
+        ports_list = self.os_admin.ports_client.list_ports(
             *args, **kwargs)
         return ports_list['ports']
 
@@ -99,13 +99,13 @@ class TestDvsNetworkBasicOps(manager.NetworkScenarioTest):
         checking the result of list_[networks,subnets]
         """
 
-        seen_nets = self.admin_manager.networks_client.list_networks()
+        seen_nets = self.os_admin.networks_client.list_networks()
         seen_names = [n['name'] for n in seen_nets['networks']]
         seen_ids = [n['id'] for n in seen_nets['networks']]
         self.assertIn(self.network['name'], seen_names)
         self.assertIn(self.network['id'], seen_ids)
 
-        seen_subnets = self.admin_manager.subnets_client.list_subnets()
+        seen_subnets = self.os_admin.subnets_client.list_subnets()
         seen_net_ids = [n['network_id'] for n in seen_subnets['subnets']]
         seen_subnet_ids = [n['id'] for n in seen_subnets['subnets']]
         self.assertIn(self.network['id'], seen_net_ids)

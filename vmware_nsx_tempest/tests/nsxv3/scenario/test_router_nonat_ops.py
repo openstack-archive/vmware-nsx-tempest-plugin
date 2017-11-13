@@ -170,7 +170,7 @@ class TestRouterNoNATOps(manager.NetworkScenarioTest):
 
     def _list_ports(self, *args, **kwargs):
         """List ports using admin creds """
-        ports_list = self.admin_manager.ports_client.list_ports(
+        ports_list = self.os_admin.ports_client.list_ports(
             *args, **kwargs)
         return ports_list['ports']
 

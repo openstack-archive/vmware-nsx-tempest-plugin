@@ -68,7 +68,7 @@ class ProjectDeleteTest(base.BaseAdminNetworkTest):
 
     @classmethod
     def create_tenant(self):
-        self.admin_manager.tenants_client
+        self.os_admin.tenants_client
 
     @classmethod
     def create_network_subnet(self, cidr=None, cidr_offset=0):
@@ -86,7 +86,7 @@ class ProjectDeleteTest(base.BaseAdminNetworkTest):
         return (net_id, s_network, subnet)
 
     def create_router_by_type(self, router_type, name=None, **kwargs):
-        routers_client = self.admin_manager.routers_client
+        routers_client = self.os_admin.routers_client
         router_name = name or data_utils.rand_name('mtz-')
         create_kwargs = dict(name=router_name, external_gateway_info={
             "network_id": CONF.network.public_network_id})
@@ -128,10 +128,10 @@ class ProjectDeleteTest(base.BaseAdminNetworkTest):
         os.environ['OS_TENANT_NAME'] = CONF.auth.admin_project_name
         os.environ['OS_PASSWORD'] = CONF.auth.admin_password
         name = data_utils.rand_name('tenant-delete-')
-        tenant = self.admin_manager.tenants_client.create_tenant(name=name)
+        tenant = self.os_admin.tenants_client.create_tenant(name=name)
         username = name + 'user'
         kwargs = {'name': username, 'pass': 'password'}
-        tenant_user = self.admin_manager.users_client.create_user(**kwargs)
+        tenant_user = self.os_admin.users_client.create_user(**kwargs)
         os.environ['OS_USERNAME'] = tenant_user['user']['username']
         os.environ['OS_TENANT_NAME'] = tenant['tenant']['name']
         os.environ['OS_PASSWORD'] = 'password'
@@ -155,7 +155,7 @@ class ProjectDeleteTest(base.BaseAdminNetworkTest):
     @decorators.idempotent_id('77ec7045-f8f0-4aa1-8e1d-68c0647fda89')
     def test_project_delete_no_resource_for_deletion(self):
         name = data_utils.rand_name('tenant-delete-')
-        network_client = self.admin_manager.networks_client
+        network_client = self.os_admin.networks_client
         create_kwargs = dict(name=name)
         network = network_client.create_network(**create_kwargs)
         network_client.delete_network(network['network']['id'])
@@ -183,16 +183,16 @@ class ProjectDeleteTest(base.BaseAdminNetworkTest):
     @decorators.idempotent_id('38bf4e22-c67a-42db-9e9d-a087369207d4')
     def test_project_delete_with_all_resorces_deleted(self):
         name = data_utils.rand_name('tenant-delete-')
-        security_client = self.admin_manager.security_groups_client
+        security_client = self.os_admin.security_groups_client
         create_kwargs = dict(name=name)
         sec_group = security_client.create_security_group(**create_kwargs)
         network_name = name
         resp = self.create_network(network_name)
         network = resp.get('network', resp)
-        routers_client = self.admin_manager.routers_client
+        routers_client = self.os_admin.routers_client
         create_kwargs = dict(name=name)
         router = routers_client.create_router(**create_kwargs)
-        floatingip_client = self.admin_manager.floating_ips_client
+        floatingip_client = self.os_admin.floating_ips_client
         create_kwargs = {'floating_network_id': CONF.network.public_network_id}
         floatingip = floatingip_client.create_floatingip(**create_kwargs)
         uri = CONF.identity.uri
@@ -215,7 +215,7 @@ class ProjectDeleteTest(base.BaseAdminNetworkTest):
         self.assertIn(check_output, purge_output)
         list_of_sec_groups = security_client.list_security_groups()
         self.assertNotIn(sec_group['security_group']['id'], list_of_sec_groups)
-        list_of_networks = self.admin_manager.networks_client.list_networks()
+        list_of_networks = self.os_admin.networks_client.list_networks()
         self.assertNotIn(network['id'], list_of_networks)
         list_of_routers = routers_client.list_routers()
         self.assertNotIn(router['router']['id'], list_of_routers)
@@ -258,8 +258,8 @@ class ProjectDeleteTest(base.BaseAdminNetworkTest):
         self.assertIn(check_output, purge_output)
         check_output = 'The following resources could not be deleted: 1 port'
         self.assertIn(check_output, purge_output)
-        list_of_subnets = self.admin_manager.subnets_client.list_subnets()
+        list_of_subnets = self.os_admin.subnets_client.list_subnets()
         self.assertNotIn(subnet['id'], list_of_subnets)
-        list_of_networks = self.admin_manager.networks_client.list_networks()
+        list_of_networks = self.os_admin.networks_client.list_networks()
         self.assertNotIn(network['id'], list_of_networks)
         LOG.debug("create VLAN network: %s", (purge_output))
