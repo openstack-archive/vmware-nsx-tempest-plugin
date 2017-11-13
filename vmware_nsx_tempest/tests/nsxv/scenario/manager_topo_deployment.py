@@ -301,13 +301,13 @@ class TopoDeployScenarioManager(manager.NetworkScenarioTest):
     def create_provider_network(self, client_mgr=None, create_body=None):
         name = create_body.get('name', None) or data_utils.rand_name('P-net')
         create_body['name'] = name
-        client_mgr = client_mgr or self.admin_manager
+        client_mgr = client_mgr or self.os_admin
         net_network = HELO.create_network(
             self, client=client_mgr.networks_client, **create_body)
         return net_network
 
     def create_provider_subnet(self, client_mgr=None, create_body=None):
-        client_mgr = client_mgr or self.admin_manager
+        client_mgr = client_mgr or self.os_admin
         subnets_client = client_mgr.subnets_client
         body = subnets_client.create_subnet(**create_body)
         net_subnet = body['subnet']

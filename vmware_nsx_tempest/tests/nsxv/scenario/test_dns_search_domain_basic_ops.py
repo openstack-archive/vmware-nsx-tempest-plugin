@@ -75,7 +75,7 @@ class TestDnsSearchDomainBasicOps(dmgr.TopoDeployScenarioManager):
 
     def create_router_by_type(self, router_type, client=None,
                               name=None, **kwargs):
-        routers_client = client or self.admin_manager.routers_client
+        routers_client = client or self.os_admin.routers_client
         create_kwargs = dict(namestart='dns-search', external_gateway_info={
             "network_id": CONF.network.public_network_id})
         if router_type in ('shared', 'exclusive'):
@@ -89,7 +89,7 @@ class TestDnsSearchDomainBasicOps(dmgr.TopoDeployScenarioManager):
 
     def create_router_and_add_interfaces(self, router_type, net_list,
                                          client_mgr=None):
-        client_mgr = client_mgr or self.admin_manager
+        client_mgr = client_mgr or self.os_admin
         routers_client = client_mgr.routers_client
         router = self.create_router_by_type(router_type,
                                             client=routers_client)
@@ -115,7 +115,7 @@ class TestDnsSearchDomainBasicOps(dmgr.TopoDeployScenarioManager):
         return security_group
 
     def wait_for_servers_become_active(self, server_id_list):
-        servers_client = self.admin_manager.servers_client
+        servers_client = self.os_admin.servers_client
         for server_id in server_id_list:
             waiters.wait_for_server_status(
                 servers_client, server_id, 'ACTIVE')
@@ -139,7 +139,7 @@ class TestDnsSearchDomainBasicOps(dmgr.TopoDeployScenarioManager):
         username, password = self.get_image_userpass()
         floatingip = super(TestDnsSearchDomainBasicOps,
                            self).create_floatingip_for_server(
-            server, client_mgr=self.admin_manager)
+            server, client_mgr=self.os_admin)
         msg = ("Associate floatingip[%s] to server[%s]"
                % (floatingip, server['name']))
         self._check_floatingip_connectivity(

@@ -142,8 +142,8 @@ class TestXnetMultiSubnetsOps(dmgr.TopoDeployScenarioManager):
         """
         super(TestXnetMultiSubnetsOps, self).setUp()
         # only admin user can manage external network/subnets
-        networks_client = self.admin_manager.networks_client
-        subnets_client = self.admin_manager.subnets_client
+        networks_client = self.os_admin.networks_client
+        subnets_client = self.os_admin.subnets_client
         self.sub2_dict = CONF.scenario.xnet_multiple_subnets_dict
         # limited to only one subnet available when test started.
         subnet_id_list = networks_client.show_network(
@@ -228,7 +228,7 @@ class TestXnetMultiSubnetsOps(dmgr.TopoDeployScenarioManager):
                            self).create_floatingip_for_server(
             server,
             external_network_id=self.public_network_id,
-            client_mgr=self.admin_manager)
+            client_mgr=self.os_admin)
         msg = ("Associate floatingip[%s] to server[%s]"
                % (floatingip, server['name']))
         self._check_floatingip_connectivity(
@@ -263,7 +263,7 @@ class TestXnetMultiSubnetsOps(dmgr.TopoDeployScenarioManager):
                                               distributed=None):
         network, subnet, router = self.setup_project_network(
             self.public_network_id,
-            client_mgr=self.admin_manager,
+            client_mgr=self.os_admin,
             tenant_id=self.primary_tenant_id,
             namestart=namestart,
             router_type=router_type, distributed=distributed)
