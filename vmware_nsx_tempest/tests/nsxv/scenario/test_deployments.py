@@ -295,7 +295,7 @@ class TestMultiTenantsNetwork(dmgr.TopoDeployScenarioManager):
         # make sure private-ip at tenat-1 is not the same being
         # assigned to tenant-2
         self.red = self.create_project_network_env(
-            self.alt_manager, 'red', False, cidr_offset=3)
+            self.os_alt, 'red', False, cidr_offset=3)
         # t1 can reach t2's public interface
         is_rechable = dmgr.check_host_is_reachable(
             self.green['node1'], self.red['node2']['dest'],
@@ -422,7 +422,7 @@ class TestProviderRouterTenantNetwork(dmgr.TopoDeployScenarioManager):
         self.yellow = self.create_project_network_env(
             'yellow', self.manager, cidr_offset=1)
         self.blue = self.create_project_network_env(
-            'blue', self.alt_manager, cidr_offset=2)
+            'blue', self.os_alt, cidr_offset=2)
         username, password = self.get_image_userpass()
         yellow = dmgr.make_node_info(self.yellow['fip'], username, password)
         blue = dmgr.make_node_info(self.blue['fip'], username, password)
