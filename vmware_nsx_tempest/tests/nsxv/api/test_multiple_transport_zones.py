@@ -140,7 +140,7 @@ class MultipleTransportZonesTest(base.BaseAdminNetworkTest):
         self.delete_network(net_id)
 
     def create_router_by_type(self, router_type, name=None, **kwargs):
-        routers_client = self.admin_manager.routers_client
+        routers_client = self.os_admin.routers_client
         router_name = name or data_utils.rand_name('mtz-')
         create_kwargs = dict(name=router_name, external_gateway_info={
             "network_id": CONF.network.public_network_id})
@@ -174,7 +174,7 @@ class MultipleTransportZonesTest(base.BaseAdminNetworkTest):
         return router
 
     def clear_router_gateway_and_interfaces(self, router, nets):
-        routers_client = self.admin_manager.routers_client
+        routers_client = self.os_admin.routers_client
         routers_client.update_router(router['id'],
                                     external_gateway_info=dict())
         for net_id, (s_id, network, subnet) in six.iteritems(nets):

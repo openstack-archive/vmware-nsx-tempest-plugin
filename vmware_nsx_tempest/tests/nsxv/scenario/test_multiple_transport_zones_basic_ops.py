@@ -112,8 +112,8 @@ class TestMultipleTransportZonesBasicOps(dmgr.TopoDeployScenarioManager):
 
         All tenant network resources will be created by ADMIN.
         """
-        networks_client = self.admin_manager.networks_client
-        subnets_client = self.admin_manager.subnets_client
+        networks_client = self.os_admin.networks_client
+        subnets_client = self.os_admin.subnets_client
         network_name = data_utils.rand_name('mtz-net')
         create_body = {'name': network_name,
                        'provider:network_type': self.provider_network_type,
@@ -148,7 +148,7 @@ class TestMultipleTransportZonesBasicOps(dmgr.TopoDeployScenarioManager):
 
     def create_router_and_add_interfaces(self, router_type, nets,
                                          client_mgr=None):
-        client_mgr = client_mgr or self.admin_manager
+        client_mgr = client_mgr or self.os_admin
         routers_client = client_mgr.routers_client
         router = self.create_router_by_type(router_type,
                                             client=routers_client)
@@ -233,7 +233,7 @@ class TestMultipleTransportZonesBasicOps(dmgr.TopoDeployScenarioManager):
         return None
 
     def wait_for_servers_become_active(self, servers, client=None):
-        servers_client = client or self.admin_manager.servers_client
+        servers_client = client or self.os_admin.servers_client
         net_id_list = servers.keys()
         for net_id in net_id_list:
             nsv = self.tp_svrs[net_id]
@@ -247,7 +247,7 @@ class TestMultipleTransportZonesBasicOps(dmgr.TopoDeployScenarioManager):
                                                             act_server)
 
     def delete_all_servers(self, client=None):
-        servers_client = client or self.admin_manager.servers_client
+        servers_client = client or self.os_admin.servers_client
         for net_id in six.iterkeys(self.tp_svrs):
             server = self.tp_svrs[net_id]['server']
             test_utils.call_and_ignore_notfound_exc(
@@ -263,7 +263,7 @@ class TestMultipleTransportZonesBasicOps(dmgr.TopoDeployScenarioManager):
             s_id, network, subnet, security_group = nets[net_id]
             """
             servers_client = (self.manager.servers_client if s_id is None
-                              else self.admin_manager.servers_client)
+                              else self.os_admin.servers_client)
             """
             security_groups = [{'name': security_group['id']}]
             svr = self.create_server_on_network(

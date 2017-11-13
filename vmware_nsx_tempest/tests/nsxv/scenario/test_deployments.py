@@ -295,7 +295,7 @@ class TestMultiTenantsNetwork(dmgr.TopoDeployScenarioManager):
         # make sure private-ip at tenat-1 is not the same being
         # assigned to tenant-2
         self.red = self.create_project_network_env(
-            self.alt_manager, 'red', False, cidr_offset=3)
+            self.os_alt, 'red', False, cidr_offset=3)
         # t1 can reach t2's public interface
         is_rechable = dmgr.check_host_is_reachable(
             self.green['node1'], self.red['node2']['dest'],
@@ -358,13 +358,13 @@ class TestProviderRouterTenantNetwork(dmgr.TopoDeployScenarioManager):
                 tenant.pop('fip')
                 self.router_interface_delete(
                     router_id, tenant['subnet']['id'],
-                    self.admin_manager.routers_client)
-                self.admin_manager.networks_client.delete_network(
+                    self.os_admin.routers_client)
+                self.os_admin.networks_client.delete_network(
                     tenant['network']['id'])
                 tenant.pop('subnet')
                 tenant.pop('network')
         self._router_clear_gateway(
-            router_id, client=self.admin_manager.routers_client)
+            router_id, client=self.os_admin.routers_client)
 
     def create_project_network_env(self, t_id, client_mgr=None,
                                    tenant_id=None, cidr_offset=0, **kwargs):
@@ -388,7 +388,7 @@ class TestProviderRouterTenantNetwork(dmgr.TopoDeployScenarioManager):
             security_group_rules_client=security_group_rules_client,
             namestart=namestart, tenant_id=tenant_id)
         self._router_add_interface(
-            self.p_router, t_subnet, self.admin_manager)
+            self.p_router, t_subnet, self.os_admin)
         return dict(id=t_id, network=t_network, subnet=t_subnet,
                     client_mgr=client_mgr, security_group=t_security_group)
 
@@ -414,15 +414,15 @@ class TestProviderRouterTenantNetwork(dmgr.TopoDeployScenarioManager):
     def test_provider_router_project_network(self):
         # provider router owned by admin_manager
         self.p_router = self._create_router(
-            client_mgr=self.admin_manager, namestart="deploy-provider-router",
+            client_mgr=self.os_admin, namestart="deploy-provider-router",
             distributed=self.tenant_router_attrs.get('distributed'),
             router_type=self.tenant_router_attrs.get('router_type'))
         self._router_set_gateway(self.p_router['id'], self.public_network_id,
-                                 client=self.admin_manager.routers_client)
+                                 client=self.os_admin.routers_client)
         self.yellow = self.create_project_network_env(
             'yellow', self.manager, cidr_offset=1)
         self.blue = self.create_project_network_env(
-            'blue', self.alt_manager, cidr_offset=2)
+            'blue', self.os_alt, cidr_offset=2)
         username, password = self.get_image_userpass()
         yellow = dmgr.make_node_info(self.yellow['fip'], username, password)
         blue = dmgr.make_node_info(self.blue['fip'], username, password)
