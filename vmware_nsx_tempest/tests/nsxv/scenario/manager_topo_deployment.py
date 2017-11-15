@@ -317,10 +317,10 @@ class TopoDeployScenarioManager(manager.NetworkScenarioTest):
         return net_subnet
 
     def setup_project_network(self, external_network_id,
-                             client_mgr=None,
-                             namestart=None, client=None,
-                             tenant_id=None, cidr_offset=0,
-                             **kwargs):
+                              client_mgr=None,
+                              namestart=None, client=None,
+                              tenant_id=None, cidr_offset=0,
+                              **kwargs):
         """NOTE:
 
             Refer to create_networks@scenario/manager.py which might refer
@@ -334,14 +334,21 @@ class TopoDeployScenarioManager(manager.NetworkScenarioTest):
         # _create_router() edits distributed and router_type
         # Child classes use class var tenant_router_attrs to define
         # tenant's router type, however, caller can overwrite it with kwargs.
-        distributed = kwargs.get('distributed',
-                                 self.tenant_router_attrs.get('distributed'))
-        router_type = kwargs.get('router_type',
-                                 self.tenant_router_attrs.get('router_type'))
-        net_router = self._create_router(
-            client_mgr=client_mgr, tenant_id=tenant_id,
-            namestart=name,
-            distributed=distributed, router_type=router_type)
+        if CONF.network.backend == "nsxv3":
+            net_router = self._create_router(client_mgr=client_mgr,
+                                             tenant_id=tenant_id,
+                                             namestart=name)
+        else:
+            distributed = \
+                kwargs.get('distributed',
+                           self.tenant_router_attrs.get('distributed'))
+            router_type = \
+                kwargs.get('router_type',
+                           self.tenant_router_attrs.get('router_type'))
+            net_router = self._create_router(
+                client_mgr=client_mgr, tenant_id=tenant_id,
+                namestart=name,
+                distributed=distributed, router_type=router_type)
         self._router_set_gateway(net_router['id'], external_network_id,
                                  client=client_mgr.routers_client)
         net_network, net_subnet = self.create_network_subnet(
@@ -429,7 +436,7 @@ class TopoDeployScenarioManager(manager.NetworkScenarioTest):
             if fip:
                 elapse_time = time.time() - start_time
                 xmsg = ("%s Take %d seconds to assign floatingip to server[%s]"
-                    % ("OS-STATS:", int(elapse_time), sv.get('name')))
+                        % ("OS-STATS:", int(elapse_time), sv.get('name')))
                 LOG.debug(xmsg)
                 return fip
             time.sleep(interval)

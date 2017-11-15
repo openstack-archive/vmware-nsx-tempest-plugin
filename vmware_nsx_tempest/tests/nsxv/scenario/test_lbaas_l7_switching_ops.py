@@ -14,6 +14,7 @@ import time
 from tempest.lib import decorators
 from tempest import test
 
+from vmware_nsx_tempest.common import constants
 from vmware_nsx_tempest.services.lbaas import l7policies_client
 from vmware_nsx_tempest.services.lbaas import l7rules_client
 from vmware_nsx_tempest.tests.nsxv.scenario import (
@@ -47,6 +48,7 @@ class TestL7SwitchingOps(lbaas_ops.LBaasRoundRobinBaseTest):
         self.switching_startswith_value1 = "/api"
         self.switching_startswith_value2 = "/api2"
         self.reject_startswith = "/api/v1"
+        self.reject_startswith2 = "/api/v2"
         self.pool7 = None
         self.l7policy1 = None
         self.l7rule1 = None
@@ -85,7 +87,7 @@ class TestL7SwitchingOps(lbaas_ops.LBaasRoundRobinBaseTest):
         self.wait_for_servers_become_active(self.l7_server_list)
         self.start_web_servers(self.l7_server_list)
 
-    def build_l7_switching(self):
+    def build_l7_switching(self, policy_type):
         subnet_id = self.subnet.get('id')
         lb_id = self.loadbalancer['id']
         l7_name = self.loadbalancer['name'] + "-7"
@@ -107,27 +109,32 @@ class TestL7SwitchingOps(lbaas_ops.LBaasRoundRobinBaseTest):
                 protocol_port=self.protocol_port)
             self.wait_for_load_balancer_status(lb_id)
             self.member7_list.append(member)
-        l7policy_kwargs = dict(action="REDIRECT_TO_POOL",
-                               redirect_pool_id=pool_id,
-                               listener_id=redirect_to_listener_id,
-                               name='policy1')
-        l7policy1 = self.l7policies_client.create_l7policy(**l7policy_kwargs)
-        self.l7policy1 = l7policy1.get(u'l7policy', l7policy1)
-        policy_id = self.l7policy1.get('id')
-        self.l7rule1 = self.l7rules_client.create_l7rule(
-            policy_id, **self.l7rule_kwargs)['rule']
-        l7policy_kwargs = dict(action="REJECT", position=1,
-                               redirect_pool_id=pool_id,
-                               listener_id=redirect_to_listener_id,
-                               name='policy-reject')
-        l7policy1 = self.l7policies_client.create_l7policy(**l7policy_kwargs)
-        self.l7policy_reject = l7policy1.get(u'l7policy', l7policy1)
-        self.reject_policy_id = self.l7policy_reject.get('id')
-        l7rule_kwargs = dict(type='PATH',
-                             compare_type='STARTS_WITH',
-                             value=self.reject_startswith)
-        self.l7rule_reject = self.l7rules_client.create_l7rule(
-            self.reject_policy_id, **l7rule_kwargs)['rule']
+        if policy_type == constants.REDIRECT_TO_POOL:
+            l7policy_kwargs = dict(action=constants.REDIRECT_TO_POOL,
+                                   redirect_pool_id=pool_id,
+                                   listener_id=redirect_to_listener_id,
+                                   name='policy1')
+            l7policy1 = \
+                self.l7policies_client.create_l7policy(**l7policy_kwargs)
+            self.l7policy1 = l7policy1.get(u'l7policy', l7policy1)
+            self.policy_id = self.l7policy1.get('id')
+            self.l7rule1 = self.l7rules_client.create_l7rule(
+                self.policy_id, **self.l7rule_kwargs)['rule']
+        elif policy_type == constants.REJECT:
+            l7policy_kwargs = dict(action=constants.REJECT, position=1,
+                                   redirect_pool_id=pool_id,
+                                   listener_id=redirect_to_listener_id,
+                                   name='policy-reject')
+            l7policy_reject = \
+                self.l7policies_client.create_l7policy(**l7policy_kwargs)
+            self.l7policy_reject = \
+                l7policy_reject.get(u'l7policy', l7policy_reject)
+            self.reject_policy_id = self.l7policy_reject.get('id')
+            self.l7rule_kwargs_reject = dict(type='PATH',
+                                             compare_type='STARTS_WITH',
+                                             value=self.reject_startswith)
+            self.l7rule_reject = self.l7rules_client.create_l7rule(
+                self.reject_policy_id, **self.l7rule_kwargs_reject)['rule']
 
     def check_l7_switching(self, start_path, expected_server_list,
                            send_count=6):
@@ -136,49 +143,67 @@ class TestL7SwitchingOps(lbaas_ops.LBaasRoundRobinBaseTest):
             self.assertIn(sv_name, expected_server_list)
             self.assertTrue(cnt > 0)
 
-    def validate_l7_switching(self):
+    def validate_l7_switching(self, policy_type):
+        time.sleep(constants.SLEEP_BETWEEN_VIRTUAL_SEREVRS_OPEARTIONS)
         l7_sv_name_list = [s['name'] for s in self.l7_server_list]
         rr_sv_name_list = [s['name'] for s in self.rr_server_list]
         reject_name_list = ["403"]
+        if policy_type == constants.REDIRECT_TO_POOL:
+            # URL prefix api switching to pool7
+            self.check_l7_switching('api', l7_sv_name_list, 6)
+            # URL prefix ap/i switching to pool1
+            self.check_l7_switching('ap/i', rr_sv_name_list, 6)
+            # URL prefix api2 switching to pool7
+            self.check_l7_switching('api2', l7_sv_name_list, 6)
+            rule_id = self.l7rule1.get('id')
+            self.l7rule_kwargs['value'] = self.switching_startswith_value2
+            self.l7rule2 = self.l7rules_client.update_l7rule(
+                self.policy_id, rule_id, **self.l7rule_kwargs)['rule']
+            time.sleep(2.0)
+            # URL prefix api switching to pool
+            self.check_l7_switching('api', rr_sv_name_list, 6)
+            # URL prefix api switching to pool
+            self.check_l7_switching('api/2', rr_sv_name_list, 6)
+            # URL prefix api2 switching to pool7
+            self.check_l7_switching('api2', l7_sv_name_list, 6)
+            # URL prefix api2 switching to pool
+            self.check_l7_switching('xapi2', rr_sv_name_list, 6)
+        elif policy_type == constants.REJECT:
+            # URL /api/v1 should be rejected, status=403
+            self.check_l7_switching('api/v1', reject_name_list, 6)
+            # change rule starts_with's value to /api2
+            # and /api & /api/2 will be swithed to default pool
+            policy_id = self.reject_policy_id
+            rule_id = self.l7rule_reject.get('id')
+            self.l7rule_kwargs_reject = dict(type='PATH',
+                                             compare_type='STARTS_WITH',
+                                             value=self.reject_startswith2)
+            self.l7rule2 = self.l7rules_client.update_l7rule(
+                policy_id, rule_id, **self.l7rule_kwargs_reject)['rule']
+            time.sleep(2.0)
+            # URL /api/v1 should be rejected, status=403
+            self.check_l7_switching('api/v2', reject_name_list, 6)
 
-        # URL prefix api switching to pool7
-        self.check_l7_switching('api', l7_sv_name_list, 6)
-        # URL prefix ap/i switching to pool1
-        self.check_l7_switching('ap/i', rr_sv_name_list, 6)
-        # URL prefix api2 switching to pool7
-        self.check_l7_switching('api2', l7_sv_name_list, 6)
-
-        # URL /api/v1 should be rejected, status=403
-        self.check_l7_switching('api/v1', reject_name_list, 6)
-
-        # change rule starts_with's value to /api2
-        # and /api & /api/2 will be swithed to default pool
-        policy_id = self.l7policy1.get('id')
-        rule_id = self.l7rule1.get('id')
-        self.l7rule_kwargs['value'] = self.switching_startswith_value2
-        self.l7rule2 = self.l7rules_client.update_l7rule(
-            policy_id, rule_id, **self.l7rule_kwargs)['rule']
-        time.sleep(2.0)
-        # URL prefix api switching to pool
-        self.check_l7_switching('api', rr_sv_name_list, 6)
-        # URL prefix api switching to pool
-        self.check_l7_switching('api/2', rr_sv_name_list, 6)
-        # URL prefix api2 switching to pool7
-        self.check_l7_switching('api2', l7_sv_name_list, 6)
-        # URL prefix api2 switching to pool
-        self.check_l7_switching('xapi2', rr_sv_name_list, 6)
-
-        # URL /api/v1 should be rejected, status=403
-        self.check_l7_switching('api/v1', reject_name_list, 6)
-
-    @decorators.idempotent_id('f11e19e4-16b5-41c7-878d-59b9e943e3ce')
+    @decorators.idempotent_id('a51e23e4-16b5-41c7-878d-59b9e943e3ba')
     @test.services('compute', 'network')
-    def test_lbaas_l7_switching_ops(self):
+    def test_lbaas_l7_switching_ops_REDIRECT_TO_POOL(self):
         self.create_lbaas_networks()
         self.start_web_servers()
         self.create_project_lbaas()
         self.check_project_lbaas()
         # do l7 provision and testing
         self.create_and_start_l7_web_servers()
-        self.build_l7_switching()
-        self.validate_l7_switching()
+        self.build_l7_switching(constants.REDIRECT_TO_POOL)
+        self.validate_l7_switching(constants.REDIRECT_TO_POOL)
+
+    @decorators.idempotent_id('f11e19e4-16b5-41c7-878d-59b9e943e3ce')
+    @test.services('compute', 'network')
+    def test_lbaas_l7_switching_ops_REJECT(self):
+        self.create_lbaas_networks()
+        self.start_web_servers()
+        self.create_project_lbaas()
+        self.check_project_lbaas()
+        # do l7 provision and testing
+        self.create_and_start_l7_web_servers()
+        self.build_l7_switching(constants.REJECT)
+        self.validate_l7_switching(constants.REJECT)

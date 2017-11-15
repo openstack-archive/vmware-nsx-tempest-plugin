@@ -91,6 +91,7 @@ class LBaasRoundRobinBaseTest(dmgr.TopoDeployScenarioManager):
         self.loadbalancer = None
         self.vip_fip = None
         self.web_service_start_delay = 2.5
+        self.time_in_adding_members = 120
 
     def tearDown(self):
         if self.vip_fip:
@@ -355,6 +356,7 @@ class LBaasRoundRobinBaseTest(dmgr.TopoDeployScenarioManager):
         return self.http_cnt
 
     def check_project_lbaas(self):
+        time.sleep(self.time_in_adding_members)
         self.do_http_request(send_counts=self.poke_counters)
         # should response from 2 servers
         self.assertEqual(2, len(self.http_cnt))
