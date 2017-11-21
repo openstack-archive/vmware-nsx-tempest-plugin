@@ -22,12 +22,12 @@ import time
 #import urllib.request
 
 import six
+from tempest.common import utils
 from tempest import config
 from tempest import exceptions
 from tempest.lib.common.utils import data_utils
 from tempest.lib.common.utils import test_utils
 from tempest.lib import decorators
-from tempest import test
 
 from vmware_nsx_tempest.services import load_balancer_v1_client as LBV1C
 from vmware_nsx_tempest.tests.nsxv.scenario import (
@@ -54,7 +54,7 @@ class TestLBaaSBasicOps(manager.NetworkScenarioTest):
     def skip_checks(cls):
         super(TestLBaaSBasicOps, cls).skip_checks()
         cfg = CONF.network
-        if not test.is_extension_enabled('lbaas', 'network'):
+        if not utils.is_extension_enabled('lbaas', 'network'):
             msg = 'LBaaS Extension is not enabled'
             raise cls.skipException(msg)
         if not (cfg.project_networks_reachable or cfg.public_network_id):
@@ -422,7 +422,7 @@ class TestLBaaSBasicOps(manager.NetworkScenarioTest):
             self.assertGreater(counter, 0, 'Member %s never balanced' % member)
 
     @decorators.idempotent_id('e81b5af1-d854-4e16-9d2d-16187bdf1334')
-    @test.services('compute', 'network')
+    @utils.services('compute', 'network')
     def test_load_balancer_basic(self):
         self._create_server('server1')
         self._start_servers()

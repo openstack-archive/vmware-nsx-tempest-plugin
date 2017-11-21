@@ -11,8 +11,8 @@
 #    under the License.
 import time
 
+from tempest.common import utils
 from tempest.lib import decorators
-from tempest import test
 
 from vmware_nsx_tempest.common import constants
 from vmware_nsx_tempest.services.lbaas import l7policies_client
@@ -185,7 +185,7 @@ class TestL7SwitchingOps(lbaas_ops.LBaasRoundRobinBaseTest):
             self.check_l7_switching('api/v2', reject_name_list, 6)
 
     @decorators.idempotent_id('a51e23e4-16b5-41c7-878d-59b9e943e3ba')
-    @test.services('compute', 'network')
+    @utils.services('compute', 'network')
     def test_lbaas_l7_switching_ops_REDIRECT_TO_POOL(self):
         self.create_lbaas_networks()
         self.start_web_servers()
@@ -197,7 +197,7 @@ class TestL7SwitchingOps(lbaas_ops.LBaasRoundRobinBaseTest):
         self.validate_l7_switching(constants.REDIRECT_TO_POOL)
 
     @decorators.idempotent_id('f11e19e4-16b5-41c7-878d-59b9e943e3ce')
-    @test.services('compute', 'network')
+    @utils.services('compute', 'network')
     def test_lbaas_l7_switching_ops_REJECT(self):
         self.create_lbaas_networks()
         self.start_web_servers()

@@ -15,8 +15,8 @@
 
 import time
 
+from tempest.common import utils
 from tempest import config
-from tempest import test
 
 from tempest.lib.common.utils import data_utils
 from tempest.lib import decorators
@@ -86,7 +86,7 @@ class TestSimpleFlatNetwork(dmgr.TopoDeployScenarioManager):
         self.waitfor_host_connected(host_ip)
 
     @decorators.idempotent_id('bc081b8d-49eb-4710-9442-c6b225ef16f0')
-    @test.services('compute', 'network')
+    @utils.services('compute', 'network')
     def test_simple_flat_network(self):
         # provider actions
         self.net_network = self.create_network()
@@ -129,7 +129,7 @@ class TestTenantConnectivity(dmgr.TopoDeployScenarioManager):
         super(TestTenantConnectivity, self).tearDown()
 
     @decorators.idempotent_id('3c6cd4fe-de25-47ef-b638-a6bbb312da09')
-    @test.services('compute', 'network')
+    @utils.services('compute', 'network')
     def test_tenant_connectivity(self):
         LOG.debug(Z_DEPLOY_TOPO, "tenant connectivity")
         client_mgr = self.manager
@@ -285,7 +285,7 @@ class TestMultiTenantsNetwork(dmgr.TopoDeployScenarioManager):
         return T
 
     @decorators.idempotent_id('19d19cd0-9686-49c9-acea-a9db28f7458c')
-    @test.services('compute', 'network')
+    @utils.services('compute', 'network')
     def test_multi_tenants_network(self):
         LOG.debug(Z_DEPLOY_TOPO, "multi tenant network")
         self.green = self.create_project_network_env(
@@ -410,7 +410,7 @@ class TestProviderRouterTenantNetwork(dmgr.TopoDeployScenarioManager):
         return tenant
 
     @decorators.idempotent_id('a31712de-33ad-4dc2-9755-1a0631a4f66a')
-    @test.services('compute', 'network')
+    @utils.services('compute', 'network')
     def test_provider_router_project_network(self):
         # provider router owned by admin_manager
         self.p_router = self._create_router(
@@ -456,7 +456,7 @@ class TestTenantConnectivityWithExclusiveRouter(
         super(TestTenantConnectivityWithExclusiveRouter,
               cls).skip_checks()
         for ext in ['nsxv-router-type']:
-            if not test.is_extension_enabled(ext, 'network'):
+            if not utils.is_extension_enabled(ext, 'network'):
                 msg = "%s extension not enabled." % ext
                 raise cls.skipException(msg)
 
@@ -476,7 +476,7 @@ class TestMultiTenantsNetworkWithExclusiveRouter(
         super(TestMultiTenantsNetworkWithExclusiveRouter,
               cls).skip_checks()
         for ext in ['nsxv-router-type']:
-            if not test.is_extension_enabled(ext, 'network'):
+            if not utils.is_extension_enabled(ext, 'network'):
                 msg = "%s extension not enabled." % ext
                 raise cls.skipException(msg)
 
@@ -496,7 +496,7 @@ class TestProviderExclusiveRouterTenantNetwork(
         super(TestProviderExclusiveRouterTenantNetwork,
               cls).skip_checks()
         for ext in ['nsxv-router-type']:
-            if not test.is_extension_enabled(ext, 'network'):
+            if not utils.is_extension_enabled(ext, 'network'):
                 msg = "%s extension not enabled." % ext
                 raise cls.skipException(msg)
 
@@ -518,7 +518,7 @@ class TestTenantConnectivityWithDistributedRouter(
         super(TestTenantConnectivityWithDistributedRouter,
               cls).skip_checks()
         for ext in ['dvr', 'nsxv-router-type']:
-            if not test.is_extension_enabled(ext, 'network'):
+            if not utils.is_extension_enabled(ext, 'network'):
                 msg = "%s extension not enabled." % ext
                 raise cls.skipException(msg)
 
@@ -538,7 +538,7 @@ class TestMultiTenantsNetworkWithDistributedRouter(
         super(TestMultiTenantsNetworkWithDistributedRouter,
               cls).skip_checks()
         for ext in ['dvr', 'nsxv-router-type']:
-            if not test.is_extension_enabled(ext, 'network'):
+            if not utils.is_extension_enabled(ext, 'network'):
                 msg = "%s extension not enabled." % ext
                 raise cls.skipException(msg)
 
@@ -558,7 +558,7 @@ class TestProviderDistributedRouterTenantNetwork(
         super(TestProviderDistributedRouterTenantNetwork,
               cls).skip_checks()
         for ext in ['dvr', 'nsxv-router-type']:
-            if not test.is_extension_enabled(ext, 'network'):
+            if not utils.is_extension_enabled(ext, 'network'):
                 msg = "%s extension not enabled." % ext
                 raise cls.skipException(msg)
 

@@ -12,12 +12,12 @@
 import tempfile
 import time
 
+from tempest.common import utils
 from tempest.common import waiters
 from tempest import config
 from tempest.lib.common.utils import data_utils
 from tempest.lib.common.utils import test_utils
 from tempest.lib import decorators
-from tempest import test
 import urllib3
 
 from vmware_nsx_tempest.services.lbaas import health_monitors_client
@@ -48,7 +48,7 @@ class LBaasRoundRobinBaseTest(dmgr.TopoDeployScenarioManager):
     def skip_checks(cls):
         super(LBaasRoundRobinBaseTest, cls).skip_checks()
         cfg = CONF.network
-        if not test.is_extension_enabled('lbaasv2', 'network'):
+        if not utils.is_extension_enabled('lbaasv2', 'network'):
             msg = 'lbaasv2 extension is not enabled.'
             raise cls.skipException(msg)
         if not (cfg.project_networks_reachable or cfg.public_network_id):
@@ -387,7 +387,7 @@ class TestLBaasRoundRobinOps(LBaasRoundRobinBaseTest):
     """
 
     @decorators.idempotent_id('077d2a5c-4938-448f-a80f-8e65f5cc49d7')
-    @test.services('compute', 'network')
+    @utils.services('compute', 'network')
     def test_lbaas_round_robin_ops(self):
         self.create_lbaas_networks()
         self.start_web_servers(self.rr_server_list)

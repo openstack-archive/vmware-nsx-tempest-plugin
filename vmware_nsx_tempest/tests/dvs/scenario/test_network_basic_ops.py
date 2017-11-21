@@ -15,11 +15,11 @@ import netaddr
 
 from oslo_log import log as logging
 
+from tempest.common import utils
 from tempest import config
 from tempest import exceptions
 from tempest.lib.common.utils import data_utils
 from tempest.lib import decorators
-from tempest import test
 
 from vmware_nsx_tempest.tests.scenario import manager
 
@@ -56,7 +56,7 @@ class TestDvsNetworkBasicOps(manager.NetworkScenarioTest):
     def _create_network(self, network_name=None):
         """Wrapper utility that returns a test admin provider network."""
         network_name = network_name or data_utils.rand_name('test-adm-net-')
-        if test.is_extension_enabled('provider', 'network'):
+        if utils.is_extension_enabled('provider', 'network'):
             body = {'name': network_name}
             body.update({'provider:network_type': 'flat',
                          'provider:physical_network': 'dvs',
@@ -168,7 +168,7 @@ class TestDvsNetworkBasicOps(manager.NetworkScenarioTest):
                                         should_connect)
 
     @decorators.attr(type='smoke')
-    @test.services('compute', 'network')
+    @utils.services('compute', 'network')
     @decorators.idempotent_id('b977dce6-6527-4676-9b66-862b22058f0f')
     def test_network_basic_ops(self):
         """
