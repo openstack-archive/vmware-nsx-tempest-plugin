@@ -22,7 +22,7 @@ from tempest.lib.common.utils import data_utils
 from tempest.lib.common.utils import test_utils
 from tempest.lib import decorators
 from tempest.lib import exceptions
-from tempest import test
+from tempest.common import utils
 
 from vmware_nsx_tempest.services import nsxv3_client
 from vmware_nsx_tempest.tests.scenario import manager
@@ -59,7 +59,7 @@ class TestRouterNoNATOps(manager.NetworkScenarioTest):
                    'public_network_id must be defined.')
             raise cls.skipException(msg)
         for ext in ['router', 'security-group']:
-            if not test.is_extension_enabled(ext, 'network'):
+            if not utils.is_extension_enabled(ext, 'network'):
                 msg = "%s extension not enabled." % ext
                 raise cls.skipException(msg)
 

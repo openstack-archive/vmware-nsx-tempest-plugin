@@ -17,7 +17,7 @@
 from oslo_log import log as logging
 
 from tempest import config
-from tempest import test
+from tempest.common import utils
 
 from tempest.lib import decorators
 
@@ -46,7 +46,7 @@ class TestCertificateMgmt(manager.NetworkScenarioTest):
             msg = ('Either project_networks_reachable must be true, or\
                 public_network_id must be defined.')
             raise cls.skipException(msg)
-        if not test.is_extension_enabled('qos', 'network'):
+        if not utils.is_extension_enabled('qos', 'network'):
             msg = "q-qos extension not enabled."
             raise cls.skipException(msg)
 

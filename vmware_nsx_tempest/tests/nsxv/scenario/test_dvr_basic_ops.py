@@ -21,7 +21,7 @@ from oslo_log import log as logging
 from tempest import config
 from tempest.lib.common.utils import data_utils
 from tempest.lib import decorators
-from tempest import test
+from tempest.common import utils
 
 from vmware_nsx_tempest.tests.nsxv.scenario import (
     network_addon_methods as HELO)
@@ -87,7 +87,7 @@ class TestDvrBasicOps(manager.NetworkScenarioTest):
                    'public_network_id must be defined.')
             raise cls.skipException(msg)
         for ext in ['router', 'security-group', 'dvr']:
-            if not test.is_extension_enabled(ext, 'network'):
+            if not utils.is_extension_enabled(ext, 'network'):
                 msg = "%s extension not enabled." % ext
                 raise cls.skipException(msg)
 
@@ -331,7 +331,7 @@ class TestDvrBasicOps(manager.NetworkScenarioTest):
                 raise
 
     @decorators.idempotent_id('62eb50a8-45f3-4eec-acc4-f01cee10a011')
-    @test.services('compute', 'network')
+    @utils.services('compute', 'network')
     def test_dvr_network_basic_ops(self):
         """
         For a freshly-booted VM with an IP address ("port") on a given
@@ -388,7 +388,7 @@ class TestDvrBasicOps(manager.NetworkScenarioTest):
                                                    "floating ip")
 
     @decorators.idempotent_id('d99b62ec-28ce-44db-a195-edb74037a354')
-    @test.services('compute', 'network')
+    @utils.services('compute', 'network')
     def test_dvr_connectivity_between_vms_on_different_networks(self):
         """
         For a freshly-booted VM with an IP address ("port") on a given
@@ -435,7 +435,7 @@ class TestDvrBasicOps(manager.NetworkScenarioTest):
                                                   should_connect=True)
 
     @decorators.idempotent_id('a73fd605-d55e-4151-b25e-41e7a7ff2258')
-    @test.services('compute', 'network')
+    @utils.services('compute', 'network')
     def test_dvr_update_router_admin_state(self):
         """
         1. Check public connectivity before updating

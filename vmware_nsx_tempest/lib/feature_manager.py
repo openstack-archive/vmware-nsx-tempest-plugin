@@ -69,12 +69,12 @@ class FeatureManager(traffic_manager.TrafficManager):
             net_client.endpoint_type,
             **_params)
         cls.load_balancers_client = \
-            load_balancers_client.get_client(cls.manager)
-        cls.listeners_client = listeners_client.get_client(cls.manager)
-        cls.pools_client = pools_client.get_client(cls.manager)
-        cls.members_client = members_client.get_client(cls.manager)
+            load_balancers_client.get_client(cls.os_primary)
+        cls.listeners_client = listeners_client.get_client(cls.os_primary)
+        cls.pools_client = pools_client.get_client(cls.os_primary)
+        cls.members_client = members_client.get_client(cls.os_primary)
         cls.health_monitors_client = \
-            health_monitors_client.get_client(cls.manager)
+            health_monitors_client.get_client(cls.os_primary)
 
     #
     # L2Gateway base class. To get basics of L2GW.

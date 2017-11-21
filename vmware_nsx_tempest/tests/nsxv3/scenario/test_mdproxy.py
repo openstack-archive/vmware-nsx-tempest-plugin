@@ -15,7 +15,7 @@ from oslo_log import log as logging
 
 from tempest import config
 from tempest.lib import decorators
-from tempest import test
+from tempest.common import utils
 
 from vmware_nsx_tempest.common import constants
 from vmware_nsx_tempest.lib import feature_manager
@@ -185,7 +185,7 @@ class TestMDProxy(feature_manager.FeatureManager):
         self.verify_md_proxy_logical_ports_on_backend(tenant_id, network_id)
 
     @decorators.idempotent_id("e9a93161-d852-414d-aa55-36d465ea45df")
-    @test.services("compute", "network")
+    @utils.services("compute", "network")
     def test_mdproxy_ping(self):
         self.deploy_mdproxy_topology()
         # Verify ssh connection and basic mdproxy data.
@@ -199,7 +199,7 @@ class TestMDProxy(feature_manager.FeatureManager):
                         ssh_client=ssh_client)
 
     @decorators.idempotent_id("743f34a6-58b8-4288-a07f-7bee21c55051")
-    @test.services("compute", "network")
+    @utils.services("compute", "network")
     def test_mdproxy_verify_backend(self):
         self.deploy_mdproxy_topology()
         # Verify ssh, detailed metadata and verify backend data
@@ -216,8 +216,9 @@ class TestMDProxy(feature_manager.FeatureManager):
         network_id = self.topology_networks["network_mdproxy"]["id"]
         self.verify_md_proxy_logical_ports_on_backend(tenant_id, network_id)
 
+    @decorators.skip_because(bug="2004971")
     @decorators.idempotent_id("fce2acc8-b850-40fe-bf02-958dd3cd4343")
-    @test.services("compute", "network")
+    @utils.services("compute", "network")
     def test_mdproxy_with_server_on_two_ls(self):
         router_mdproxy = self.create_topology_router("router_mdproxy")
         network_mdproxy = self.create_topology_network("network_mdproxy")
@@ -247,7 +248,7 @@ class TestMDProxy(feature_manager.FeatureManager):
             fixed_ip=fixed_ip_1)
 
     @decorators.idempotent_id("67332752-1295-42cb-a8c3-99210fb6b00b")
-    @test.services("compute", "network")
+    @utils.services("compute", "network")
     def test_mdproxy_isolated_network(self):
         # Deploy topology without tier1 router
         self.deploy_mdproxy_topology_2()
@@ -258,7 +259,7 @@ class TestMDProxy(feature_manager.FeatureManager):
 
     @decorators.idempotent_id("cc8d2ab8-0bea-4e32-bf80-c9c46a7612b7")
     @decorators.attr(type=["negative"])
-    @test.services("compute", "network")
+    @utils.services("compute", "network")
     def test_mdproxy_delete_when_ls_bounded(self):
         self.deploy_mdproxy_topology_2()
         md_proxy_uuid = self.nsx.get_md_proxies()[0]["id"]
@@ -268,7 +269,7 @@ class TestMDProxy(feature_manager.FeatureManager):
                          constants.MD_ERROR_CODE_WHEN_LS_BOUNDED)
 
     @decorators.idempotent_id("501fc3ea-696b-4e9e-b383-293ab94e2545")
-    @test.services("compute", "network")
+    @utils.services("compute", "network")
     def test_mdproxy_with_multiple_ports_on_network(self):
         self.deploy_mdproxy_topology()
         # Boot 2nd vm on same network
@@ -303,7 +304,7 @@ class TestMDProxy(feature_manager.FeatureManager):
         self.verify_md_proxy_logical_ports_on_backend(tenant_id, network_id)
 
     @decorators.idempotent_id("eae21afc-50ea-42e5-9c49-2ee38cee9f06")
-    @test.services("compute", "network")
+    @utils.services("compute", "network")
     def test_mdproxy_with_multiple_metadata_ports(self):
         self.deploy_mdproxy_topology_3()
         # Verify 1st instance on the network1
@@ -331,7 +332,7 @@ class TestMDProxy(feature_manager.FeatureManager):
 
     @decorators.idempotent_id("29d44d7c-6ea1-4b30-a6c3-a2695c2486fe")
     @decorators.attr(type=["negative"])
-    @test.services("compute", "network")
+    @utils.services("compute", "network")
     def test_mdproxy_with_incorrect_password(self):
         self.deploy_mdproxy_topology()
         ssh_client = self.verify_server_ssh(
@@ -342,32 +343,37 @@ class TestMDProxy(feature_manager.FeatureManager):
         self._verify_md(md_url=md_url_pubic_ipv4, expected_value="",
                         ssh_client=ssh_client, sub_result="403 Forbidden")
 
+    @decorators.skip_because(bug="2004971")
     @decorators.idempotent_id("74e5d545-3ccc-46c8-9bda-16ccf8730a5b")
-    @test.services("compute", "network")
+    @utils.services("compute", "network")
     def test_mdproxy_with_cirros_kvm_server_image(self):
         image_id = self.get_glance_image_id(["cirros", "kvm"])
         self.metadata_test_on_various_glance_image(image_id)
 
+    @decorators.skip_because(bug="2004971")
     @decorators.idempotent_id("35babffc-f098-4705-82b7-ab96a6f4fdd8")
-    @test.services("compute", "network")
+    @utils.services("compute", "network")
     def test_mdproxy_with_debian_esx_server_image(self):
         image_id = self.get_glance_image_id(["debian", "esx"])
         self.metadata_test_on_various_glance_image(image_id)
 
+    @decorators.skip_because(bug="2004971")
     @decorators.idempotent_id("71ba325f-083b-4247-9192-a9f54d3ecfd2")
-    @test.services("compute", "network")
+    @utils.services("compute", "network")
     def test_mdproxy_with_debian_kvm_server_image(self):
         image_id = self.get_glance_image_id(["debian", "kvm"])
         self.metadata_test_on_various_glance_image(image_id)
 
+    @decorators.skip_because(bug="2004971")
     @decorators.idempotent_id("dfed6074-c4a1-4bf7-a805-80a191ea7875")
-    @test.services("compute", "network")
+    @utils.services("compute", "network")
     def test_mdproxy_with_xenial_esx_server_image(self):
         image_id = self.get_glance_image_id(["xenial", "esx"])
         self.metadata_test_on_various_glance_image(image_id)
 
+    @decorators.skip_because(bug="2004971")
     @decorators.idempotent_id("55829b7f-1535-41d8-833f-b20ac0ee48e0")
-    @test.services("compute", "network")
+    @utils.services("compute", "network")
     def test_mdproxy_with_xenial_kvm_server_image(self):
         image_id = self.get_glance_image_id(["xenial", "kvm"])
         self.metadata_test_on_various_glance_image(image_id)
