@@ -13,6 +13,8 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
+import time
+
 from tempest import config
 from tempest.lib.common.utils import data_utils
 from tempest.lib.common.utils import test_utils
@@ -278,6 +280,7 @@ class FeatureManager(traffic_manager.TrafficManager):
             self.wait_for_load_balancer_status(lb_id)
 
     def check_lbaas_project_least_connections(self, no_vms):
+        time.sleep(constants.SLEEP_BETWEEN_VIRTUAL_SEREVRS_OPEARTIONS)
         vip = self.vip_ip_address
         for count in range(1, 10):
             self.do_http_request(vip=vip, send_counts=self.poke_counters)
@@ -287,6 +290,7 @@ class FeatureManager(traffic_manager.TrafficManager):
 
     def check_lbaas_project_weight_values(self, count=2):
         vip = self.vip_ip_address
+        time.sleep(constants.SLEEP_BETWEEN_VIRTUAL_SEREVRS_OPEARTIONS)
         self.do_http_request(vip=vip, send_counts=self.poke_counters)
         # ROUND_ROUBIN, so equal counts
         no_of_vms = len(self.http_cnt)
@@ -306,6 +310,7 @@ class FeatureManager(traffic_manager.TrafficManager):
 
     def check_project_lbaas(self, count=2):
         i = 0
+        time.sleep(constants.SLEEP_BETWEEN_VIRTUAL_SEREVRS_OPEARTIONS)
         vip = self.vip_ip_address
         self.do_http_request(vip=vip, send_counts=self.poke_counters)
         # ROUND_ROUBIN, so equal counts
