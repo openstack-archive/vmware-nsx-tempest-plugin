@@ -552,8 +552,8 @@ class QosBandwidthLimitRuleTest(BaseQosTest):
     """QoS Bandwidth limit rule CURD operations."""
 
     @decorators.idempotent_id('8a59b00b-3e9c-4787-92f8-93a5cdf5e378')
-    def test_rule_create(self):
-        """qos-bandwidth-limit-rule-create POLICY_ID."""
+    def test_egress_rule_create(self):
+        """qos-bandwidth-limit-egress-rule-create POLICY_ID."""
         qos_client = self.adm_qos_client
         policy = self.create_qos_policy(name='test-policy',
                                         description='test policy',
@@ -561,7 +561,8 @@ class QosBandwidthLimitRuleTest(BaseQosTest):
         self.addCleanup(test_utils.call_and_ignore_notfound_exc,
                         self.adm_qos_client.delete_policy, policy['id'])
         rule = self.create_qos_bandwidth_limit_rule(
-            policy_id=policy['id'], max_kbps=2000, max_burst_kbps=1337)
+            policy_id=policy['id'], max_kbps=2000, max_burst_kbps=1337,
+            direction='egress')
 
         # Test 'show rule'
         retrieved_rule = qos_client.show_bandwidth_limit_rule(
@@ -569,6 +570,40 @@ class QosBandwidthLimitRuleTest(BaseQosTest):
         self.assertEqual(rule['id'], retrieved_rule['id'])
         self.assertEqual(2000, retrieved_rule['max_kbps'])
         self.assertEqual(1337, retrieved_rule['max_burst_kbps'])
+        self.assertEqual('egress', retrieved_rule['direction'])
+        # Test 'list rules'
+        rules = qos_client.list_bandwidth_limit_rules(policy['id'])
+        rules_ids = [r['id'] for r in rules]
+        self.assertIn(rule['id'], rules_ids)
+
+        # Test 'show policy'
+        retrieved_policy = qos_client.show_policy(policy['id'])
+        policy_rules = retrieved_policy['rules']
+        self.assertEqual(1, len(policy_rules))
+        self.assertEqual(rule['id'], policy_rules[0]['id'])
+        self.assertEqual(base_qos.RULE_TYPE_BANDWIDTH_LIMIT,
+                         policy_rules[0]['type'])
+
+    @decorators.idempotent_id('4486734b-d235-4e9f-ad6a-eb9600c50fbe')
+    def test_ingress_rule_create(self):
+        """qos-bandwidth-limit-ingress-rule-create POLICY_ID."""
+        qos_client = self.adm_qos_client
+        policy = self.create_qos_policy(name='test-policy',
+                                        description='test policy',
+                                        shared=False)
+        self.addCleanup(test_utils.call_and_ignore_notfound_exc,
+                        self.adm_qos_client.delete_policy, policy['id'])
+        rule = self.create_qos_bandwidth_limit_rule(
+            policy_id=policy['id'], max_kbps=2000, max_burst_kbps=1337,
+            direction='ingress')
+
+        # Test 'show rule'
+        retrieved_rule = qos_client.show_bandwidth_limit_rule(
+            rule['id'], policy['id'])
+        self.assertEqual(rule['id'], retrieved_rule['id'])
+        self.assertEqual(2000, retrieved_rule['max_kbps'])
+        self.assertEqual(1337, retrieved_rule['max_burst_kbps'])
+        self.assertEqual('ingress', retrieved_rule['direction'])
 
         # Test 'list rules'
         rules = qos_client.list_bandwidth_limit_rules(policy['id'])
@@ -582,6 +617,40 @@ class QosBandwidthLimitRuleTest(BaseQosTest):
         self.assertEqual(rule['id'], policy_rules[0]['id'])
         self.assertEqual(base_qos.RULE_TYPE_BANDWIDTH_LIMIT,
                          policy_rules[0]['type'])
+
+    @decorators.idempotent_id('859288c6-3e45-415b-9aad-0d347a715a96')
+    def test_bandwidth_rule_create(self):
+        """qos-bandwidth-limit-rule-create POLICY_ID."""
+        qos_client = self.adm_qos_client
+        policy = self.create_qos_policy(name='test-policy',
+                                        description='test policy',
+                                        shared=False)
+        self.addCleanup(test_utils.call_and_ignore_notfound_exc,
+                        self.adm_qos_client.delete_policy, policy['id'])
+        egress_rule = self.create_qos_bandwidth_limit_rule(
+            policy_id=policy['id'], max_kbps=2000, max_burst_kbps=1337,
+            direction='egress')
+        ingress_rule = self.create_qos_bandwidth_limit_rule(
+            policy_id=policy['id'], max_kbps=2000, max_burst_kbps=1337,
+            direction='ingress')
+        # Test 'show rule'
+        retrieved_rule = qos_client.show_bandwidth_limit_rule(
+            egress_rule['id'], policy['id'])
+        self.assertEqual(egress_rule['id'], retrieved_rule['id'])
+        self.assertEqual(2000, retrieved_rule['max_kbps'])
+        self.assertEqual(1337, retrieved_rule['max_burst_kbps'])
+        self.assertEqual('egress', retrieved_rule['direction'])
+        retrieved_rule = qos_client.show_bandwidth_limit_rule(
+            ingress_rule['id'], policy['id'])
+        self.assertEqual(ingress_rule['id'], retrieved_rule['id'])
+        self.assertEqual(2000, retrieved_rule['max_kbps'])
+        self.assertEqual(1337, retrieved_rule['max_burst_kbps'])
+        self.assertEqual('ingress', retrieved_rule['direction'])
+        # Test 'list rules'
+        rules = qos_client.list_bandwidth_limit_rules(policy['id'])
+        rules_ids = [r['id'] for r in rules]
+        self.assertIn(egress_rule['id'], rules_ids)
+        self.assertIn(ingress_rule['id'], rules_ids)
 
     @decorators.attr(type='negative')
     @decorators.idempotent_id('8a59b00b-ab01-4787-92f8-93a5cdf5e378')
@@ -601,8 +670,8 @@ class QosBandwidthLimitRuleTest(BaseQosTest):
                           max_kbps=2001, max_burst_kbps=1338)
 
     @decorators.idempotent_id('149a6988-2568-47d2-931e-2dbc858943b3')
-    def test_rule_update(self):
-        """qos-bandwidth-limit-rule-update RULE-ID POLICY_ID."""
+    def test_egress_rule_update(self):
+        """qos-bandwidth-limit-egress-rule-update RULE-ID POLICY_ID."""
         qos_client = self.adm_qos_client
         max_kbps = 2000
         max_burst_kbps = 1337
@@ -612,7 +681,8 @@ class QosBandwidthLimitRuleTest(BaseQosTest):
         self.addCleanup(test_utils.call_and_ignore_notfound_exc,
                         self.adm_qos_client.delete_policy, policy['id'])
         rule = self.create_qos_bandwidth_limit_rule(
-            policy_id=policy['id'], max_kbps=2000, max_burst_kbps=1000)
+            policy_id=policy['id'], max_kbps=2000, max_burst_kbps=1000,
+            direction='egress')
 
         qos_client.update_bandwidth_limit_rule(
             rule['id'], policy['id'],
@@ -622,10 +692,59 @@ class QosBandwidthLimitRuleTest(BaseQosTest):
             rule['id'], policy['id'])
         self.assertEqual(max_kbps, retrieved_rule['max_kbps'])
         self.assertEqual(max_burst_kbps, retrieved_rule['max_burst_kbps'])
+        self.assertEqual('egress', retrieved_rule['direction'])
+
+    @decorators.idempotent_id('11d24de5-660f-4956-934e-d972239ccc83')
+    def test_ingress_rule_update(self):
+        """qos-bandwidth-limit-ingress-rule-update RULE-ID POLICY_ID."""
+        qos_client = self.adm_qos_client
+        max_kbps = 2000
+        max_burst_kbps = 1337
+        policy = self.create_qos_policy(name='test-policy',
+                                        description='test policy',
+                                        shared=False)
+        self.addCleanup(test_utils.call_and_ignore_notfound_exc,
+                        self.adm_qos_client.delete_policy, policy['id'])
+        rule = self.create_qos_bandwidth_limit_rule(
+            policy_id=policy['id'], max_kbps=2000, max_burst_kbps=1000,
+            direction='ingress')
+
+        qos_client.update_bandwidth_limit_rule(
+            rule['id'], policy['id'],
+            max_kbps=max_kbps, max_burst_kbps=max_burst_kbps)
+
+        retrieved_rule = qos_client.show_bandwidth_limit_rule(
+            rule['id'], policy['id'])
+        self.assertEqual(max_kbps, retrieved_rule['max_kbps'])
+        self.assertEqual(max_burst_kbps, retrieved_rule['max_burst_kbps'])
+        self.assertEqual('ingress', retrieved_rule['direction'])
+
+    @decorators.idempotent_id('14b3c06b-8dff-4b95-b868-bdfb2ad95c2d')
+    def test_bandwidth_rule_update(self):
+        """qos-bandwidth-limit-rule-update direction type."""
+        qos_client = self.adm_qos_client
+        policy = self.create_qos_policy(name='test-policy',
+                                        description='test policy',
+                                        shared=False)
+        self.addCleanup(test_utils.call_and_ignore_notfound_exc,
+                        self.adm_qos_client.delete_policy, policy['id'])
+        rule = self.create_qos_bandwidth_limit_rule(
+            policy_id=policy['id'], max_kbps=2000, max_burst_kbps=1000,
+            direction='ingress')
+
+        qos_client.update_bandwidth_limit_rule(
+            rule['id'], policy['id'],
+            direction='egress')
+
+        retrieved_rule = qos_client.show_bandwidth_limit_rule(
+            rule['id'], policy['id'])
+        self.assertEqual(2000, retrieved_rule['max_kbps'])
+        self.assertEqual(1000, retrieved_rule['max_burst_kbps'])
+        self.assertEqual('egress', retrieved_rule['direction'])
 
     @decorators.idempotent_id('67ee6efd-7b33-4a68-927d-275b4f8ba958')
-    def test_rule_delete(self):
-        """qos-bandwidth-limit-rule-delete RULE-ID POLICY_ID."""
+    def test_egress_rule_delete(self):
+        """qos-bandwidth-limit-egress-rule-delete RULE-ID POLICY_ID."""
         qos_client = self.adm_qos_client
         max_kbps = 2000
         max_burst_kbps = 1337
@@ -636,7 +755,8 @@ class QosBandwidthLimitRuleTest(BaseQosTest):
                         self.adm_qos_client.delete_policy, policy['id'])
         rule = self.create_qos_bandwidth_limit_rule(
             policy['id'],
-            max_kbps=max_kbps, max_burst_kbps=max_burst_kbps)
+            max_kbps=max_kbps, max_burst_kbps=max_burst_kbps,
+            direction='egress')
 
         retrieved_rule = qos_client.show_bandwidth_limit_rule(
             rule['id'], policy['id'])
@@ -647,6 +767,68 @@ class QosBandwidthLimitRuleTest(BaseQosTest):
         self.assertRaises(exceptions.NotFound,
                           qos_client.show_bandwidth_limit_rule,
                           rule['id'], policy['id'])
+
+    @decorators.idempotent_id('b39e0398-fcd9-4357-bfb3-e3464ca46240')
+    def test_ingress_rule_delete(self):
+        """qos-bandwidth-limit-ingress-rule-delete RULE-ID POLICY_ID."""
+        qos_client = self.adm_qos_client
+        max_kbps = 2000
+        max_burst_kbps = 1337
+        policy = self.create_qos_policy(name='test-policy',
+                                        description='test policy',
+                                        shared=False)
+        self.addCleanup(test_utils.call_and_ignore_notfound_exc,
+                        self.adm_qos_client.delete_policy, policy['id'])
+        rule = self.create_qos_bandwidth_limit_rule(
+            policy['id'],
+            max_kbps=max_kbps, max_burst_kbps=max_burst_kbps,
+            direction='ingress')
+
+        retrieved_rule = qos_client.show_bandwidth_limit_rule(
+            rule['id'], policy['id'])
+        self.assertEqual(rule['id'], retrieved_rule['id'])
+
+        qos_client.delete_bandwidth_limit_rule(
+            rule['id'], policy['id'])
+        self.assertRaises(exceptions.NotFound,
+                          qos_client.show_bandwidth_limit_rule,
+                          rule['id'], policy['id'])
+
+    @decorators.idempotent_id('aadf409b-66ef-42b9-bf5c-da8a121676af')
+    def test_bandwidth_rule_delete(self):
+        """qos-bandwidth-limit-rule-delete for both rules under a policy."""
+        qos_client = self.adm_qos_client
+        max_kbps = 2000
+        max_burst_kbps = 1337
+        policy = self.create_qos_policy(name='test-policy',
+                                        description='test policy',
+                                        shared=False)
+        self.addCleanup(test_utils.call_and_ignore_notfound_exc,
+                        self.adm_qos_client.delete_policy, policy['id'])
+        egress_rule = self.create_qos_bandwidth_limit_rule(
+            policy['id'],
+            max_kbps=max_kbps, max_burst_kbps=max_burst_kbps,
+            direction='egress')
+        ingress_rule = self.create_qos_bandwidth_limit_rule(
+            policy['id'],
+            max_kbps=max_kbps, max_burst_kbps=max_burst_kbps,
+            direction='ingress')
+        egress_retrieved_rule = qos_client.show_bandwidth_limit_rule(
+            egress_rule['id'], policy['id'])
+        self.assertEqual(egress_rule['id'], egress_retrieved_rule['id'])
+        ingress_retrieved_rule = qos_client.show_bandwidth_limit_rule(
+            ingress_rule['id'], policy['id'])
+        self.assertEqual(ingress_rule['id'], ingress_retrieved_rule['id'])
+        qos_client.delete_bandwidth_limit_rule(
+            egress_rule['id'], policy['id'])
+        self.assertRaises(exceptions.NotFound,
+                          qos_client.show_bandwidth_limit_rule,
+                          egress_rule['id'], policy['id'])
+        qos_client.delete_bandwidth_limit_rule(
+            ingress_rule['id'], policy['id'])
+        self.assertRaises(exceptions.NotFound,
+                          qos_client.show_bandwidth_limit_rule,
+                          ingress_rule['id'], policy['id'])
 
     @decorators.attr(type='negative')
     @decorators.idempotent_id('f211222c-5808-46cb-a961-983bbab6b852')
