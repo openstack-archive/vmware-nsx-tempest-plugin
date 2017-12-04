@@ -137,7 +137,7 @@ class LBaasRoundRobinBaseTest(feature_manager.FeatureManager):
         self.start_web_servers(constants.HTTP_PORT)
         self.create_project_lbaas(protocol_type="HTTP", protocol_port="80",
                                   lb_algorithm="ROUND_ROBIN", hm_type='HTTP')
-        self.check_lbaas_project_least_connections(constants.NO_OF_VMS_2)
+        self.check_lbaas_project_weight_values(constants.NO_OF_VMS_2)
 
     @decorators.attr(type='nsxv3')
     @decorators.idempotent_id('60e9facf-b8d6-48a9-b0d2-942e5bb38f38')
@@ -147,7 +147,7 @@ class LBaasRoundRobinBaseTest(feature_manager.FeatureManager):
         self.create_project_lbaas(protocol_type="HTTP", protocol_port="80",
                                   lb_algorithm="LEAST_CONNECTIONS",
                                   hm_type='PING')
-        self.check_lbaas_project_least_connections(constants.NO_OF_VMS_2)
+        self.check_lbaas_project_weight_values(constants.NO_OF_VMS_2)
 
     @decorators.attr(type='nsxv3')
     @decorators.idempotent_id('3041a103-e03d-4660-b411-2f9d5987dba8')
@@ -157,7 +157,7 @@ class LBaasRoundRobinBaseTest(feature_manager.FeatureManager):
         self.create_project_lbaas(protocol_type="HTTP", protocol_port="80",
                                   lb_algorithm="LEAST_CONNECTIONS",
                                   hm_type='HTTP')
-        self.check_lbaas_project_least_connections(constants.NO_OF_VMS_2)
+        self.check_lbaas_project_weight_values(constants.NO_OF_VMS_2)
 
     @decorators.attr(type='nsxv3')
     @decorators.idempotent_id('73190a30-3879-4828-a198-4d3fff4cea3a')
@@ -177,7 +177,7 @@ class LBaasRoundRobinBaseTest(feature_manager.FeatureManager):
         self.create_project_lbaas(protocol_type="HTTP", protocol_port="80",
                                   lb_algorithm="LEAST_CONNECTIONS",
                                   hm_type='HTTP')
-        self.check_lbaas_project_least_connections(constants.NO_OF_VMS_2)
+        self.check_lbaas_project_weight_values(constants.NO_OF_VMS_2)
         self.update_members_weight(1)
         self.check_lbaas_project_weight_values(constants.NO_OF_VMS_2)
 
@@ -189,7 +189,7 @@ class LBaasRoundRobinBaseTest(feature_manager.FeatureManager):
         self.create_project_lbaas(protocol_type="HTTP", protocol_port="80",
                                   lb_algorithm="LEAST_CONNECTIONS",
                                   hm_type='HTTP')
-        self.check_lbaas_project_least_connections(constants.NO_OF_VMS_2)
+        self.check_lbaas_project_weight_values(constants.NO_OF_VMS_2)
         self.update_pool_algorithm("ROUND_ROBIN")
         self.check_project_lbaas()
 
@@ -227,7 +227,7 @@ class LBaasRoundRobinBaseTest(feature_manager.FeatureManager):
         self.check_project_lbaas()
         self.create_addtional_lbaas_members(constants.HTTP_PORT)
         time.sleep(constants.SLEEP_BETWEEN_VIRTUAL_SEREVRS_OPEARTIONS)
-        self.check_lbaas_project_least_connections(constants.NO_OF_VMS_4)
+        self.check_lbaas_project_weight_values(constants.NO_OF_VMS_4)
 
     @decorators.attr(type='nsxv3')
     @decorators.idempotent_id('28e9d22d-4da2-460e-9c5b-bd8ddc1d35b6')

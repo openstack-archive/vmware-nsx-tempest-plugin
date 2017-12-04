@@ -279,15 +279,6 @@ class FeatureManager(traffic_manager.TrafficManager):
                 protocol_port=protocol_port)
             self.wait_for_load_balancer_status(lb_id)
 
-    def check_lbaas_project_least_connections(self, no_vms):
-        time.sleep(constants.SLEEP_BETWEEN_VIRTUAL_SEREVRS_OPEARTIONS)
-        vip = self.vip_ip_address
-        for count in range(1, 10):
-            self.do_http_request(vip=vip, send_counts=self.poke_counters)
-        # ROUND_ROUBIN, so equal counts
-        no_of_vms = len(self.http_cnt)
-        self.assertEqual(no_vms, no_of_vms)
-
     def check_lbaas_project_weight_values(self, count=2):
         vip = self.vip_ip_address
         time.sleep(constants.SLEEP_BETWEEN_VIRTUAL_SEREVRS_OPEARTIONS)
