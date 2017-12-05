@@ -102,6 +102,7 @@ class ApplianceManager(manager.NetworkScenarioTest):
             network_id=self.topology_public_network_id)}
         routers_client.update_router(router['id'], **public_network_info)
         self.topology_routers[router_name] = router
+        self.addCleanup(self.routers_client.delete_router, router['id'])
         return router
 
     def create_topology_network(

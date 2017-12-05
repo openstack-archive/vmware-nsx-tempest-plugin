@@ -342,11 +342,10 @@ class TestProviderSecurityGroup(manager.NetworkScenarioTest):
                                         private_ip_address_psg_vm,
                                         private_key_default_vm,
                                         should_connect=False)
-        p_client = self.ports_client
         kwargs = {"provider_security_groups": []}
         port_id = self.get_port_id(network['id'],
                                    network_topo['subnet']['id'], server_psg)
-        p_client.update_port(port_id, **kwargs)
+        self.cmgr_adm.ports_client.update_port(port_id, **kwargs)
         self._check_server_connectivity(ip_address_default_vm,
                                         private_ip_address_psg_vm,
                                         private_key_default_vm)
