@@ -304,7 +304,7 @@ class VSMClient(object):
                         if member['member']['name']]
         return exclude_list
 
-    def get_dhcp_edge_info(self):
+    def get_dhcp_edge_info(self, version=None):
         """Get dhcp edge info.
 
         Return edge if found, else return None.
@@ -316,7 +316,11 @@ class VSMClient(object):
                     and not e['state'] == 'undeployed'):
                 p = re.compile(r'dhcp*')
                 if (p.match(e['name'])):
-                    edge_list.append(e['recentJobInfo']['edgeId'])
+                    if version is not None and \
+                            version[0:5] >= "6.4.0":
+                        edge_list.append(e['id'])
+                    else:
+                        edge_list.append(e['recentJobInfo']['edgeId'])
         count = 0
         result_edge = {}
         for edge_id in edge_list:

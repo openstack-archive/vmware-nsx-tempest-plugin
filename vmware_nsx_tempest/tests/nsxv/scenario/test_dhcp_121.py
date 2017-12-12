@@ -72,9 +72,9 @@ class TestDHCP121BasicOps(dmgr.TopoDeployScenarioManager):
                                CONF.nsxv.manager_uri).group(0)
         cls.vsm = nsxv_client.VSMClient(
             manager_ip, CONF.nsxv.user, CONF.nsxv.password)
-        nsxv_version = cls.vsm.get_vsm_version()
+        cls.nsxv_version = cls.vsm.get_vsm_version()
         # Raise skip testcase exception if nsx-v version is less than 6.2.3
-        if (nsxv_version and nsxv_version < '6.2.3'):
+        if (cls.nsxv_version and cls.nsxv_version < '6.2.3'):
             msg = ('NSX-v version should be greater than or equal to 6.2.3')
             raise cls.skipException(msg)
 
@@ -132,7 +132,8 @@ class TestDHCP121BasicOps(dmgr.TopoDeployScenarioManager):
         self.assertIn('latest', out_data)
         LOG.info("metadata server is acessible")
         # Fetch dhcp edge infor from nsx-v
-        exc_edge = self.vsm.get_dhcp_edge_info()
+        exc_edge = \
+            self.vsm.get_dhcp_edge_info(version=self.nsxv_version)
         self.assertIsNotNone(exc_edge)
         # Fetch host-route and metadata info from nsx-v
         dhcp_options_info = {}
@@ -186,7 +187,7 @@ class TestDHCP121BasicOps(dmgr.TopoDeployScenarioManager):
         self.assertIn(self.nexthop_host_route, out_data)
         LOG.info("Host routes available on vm")
         # Check Host route info at beckend
-        exc_edge = self.vsm.get_dhcp_edge_info()
+        exc_edge = self.vsm.get_dhcp_edge_info(version=self.nsxv_version)
         self.assertIsNotNone(exc_edge)
         # Fetch host-route and metadata info from nsx-v
         dhcp_options_info = {}
@@ -216,7 +217,7 @@ class TestDHCP121BasicOps(dmgr.TopoDeployScenarioManager):
         self.assertNotIn(
             _subnet_data['new_host_routes'][0]['destination'], out_data)
         # Check Host-routes at beckend after deletion
-        exc_edge = self.vsm.get_dhcp_edge_info()
+        exc_edge = self.vsm.get_dhcp_edge_info(version=self.nsxv_version)
         self.assertIsNotNone(exc_edge)
         dhcp_options_info = []
         dhcp_options_info = exc_edge['staticBindings']['staticBindings'][0][
