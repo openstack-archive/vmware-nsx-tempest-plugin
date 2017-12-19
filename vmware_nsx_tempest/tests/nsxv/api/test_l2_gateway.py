@@ -77,6 +77,7 @@ class L2GatewayTest(base.BaseAdminNetworkTest):
 
     @classmethod
     def resource_cleanup(cls):
+        super(L2GatewayTest, cls).resource_cleanup()
         for _id in cls.l2gw_created.keys():
             try:
                 cls.l2gw_client.delete_l2_gateway(_id)
