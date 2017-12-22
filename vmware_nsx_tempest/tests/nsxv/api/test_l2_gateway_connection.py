@@ -109,8 +109,7 @@ class L2GatewayConnectionTest(base.BaseAdminNetworkTest):
     @classmethod
     def resource_cleanup(cls):
         cls.l2gw_cleanup()
-        if hasattr(cls, 'network'):
-            cls.networks_client.delete_network(cls.network['id'])
+        super(L2GatewayConnectionTest, cls).resource_cleanup()
 
     @classmethod
     def l2gw_cleanup(cls):
