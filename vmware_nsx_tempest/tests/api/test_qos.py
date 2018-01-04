@@ -59,19 +59,7 @@ class BaseQosTest(base.BaseAdminNetworkTest):
 
     @classmethod
     def resource_cleanup(cls):
-        """cleanup resources before handing over to framework."""
-        for network in cls.networks:
-            # network cannot be deleted if its ports have policy associated.
-            port_list = cls.admin_mgr.ports_client.list_ports(
-                network_id=network['id'])['ports']
-            for port in port_list:
-                test_utils.call_and_ignore_notfound_exc(
-                    cls.delete_port, port['id'])
-            test_utils.call_and_ignore_notfound_exc(
-                cls.delete_network, network['id'])
-        for policy in cls.policies_created:
-            test_utils.call_and_ignore_notfound_exc(
-                cls.adm_qos_client.delete_policy, policy['id'])
+        """cleanup resources handled by base class."""
         super(BaseQosTest, cls).resource_cleanup()
 
     @classmethod
@@ -115,7 +103,6 @@ class BaseQosTest(base.BaseAdminNetworkTest):
         body = client_mgr.networks_client.create_network(
             name=network_name, **kwargs)
         network = body['network']
-        cls.networks.append(network)
         return network
 
     @classmethod
