@@ -38,9 +38,12 @@ LOG = constants.log.getLogger(__name__)
 
 CONF = config.CONF
 
+RULE_TYPE_BANDWIDTH_LIMIT = "bandwidth_limit"
+RULE_TYPE_DSCP_MARK = "dscp_marking"
+
 
 # It includes feature related function such CRUD Mdproxy, L2GW or QoS
-class FeatureManager(traffic_manager.TrafficManager):
+class FeatureManager(traffic_manager.IperfManager):
     @classmethod
     def setup_clients(cls):
         """Create various client connections. Such as NSXv3 and L2 Gateway.
@@ -80,12 +83,29 @@ class FeatureManager(traffic_manager.TrafficManager):
         cls.members_client = members_client.get_client(cls.os_primary)
         cls.health_monitors_client = \
             health_monitors_client.get_client(cls.os_primary)
+<<<<<<< HEAD
         cls.fwaas_v2_client = openstack_network_clients.FwaasV2Client(
+=======
+        cls.qos_policy_client = openstack_network_clients.QosPoliciesClient(
             net_client.auth_provider,
             net_client.service,
             net_client.region,
             net_client.endpoint_type,
             **_params)
+        cls.qos_bw_client = openstack_network_clients.QosBWLimitClient(
+            net_client.auth_provider,
+            net_client.service,
+            net_client.region,
+            net_client.endpoint_type,
+            **_params)
+        cls.qos_dscp_client = openstack_network_clients.QosDscpClient(
+>>>>>>> fbbfe8e... [QOS] Scenario tests based on new tempest design
+            net_client.auth_provider,
+            net_client.service,
+            net_client.region,
+            net_client.endpoint_type,
+            **_params)
+<<<<<<< HEAD
 
     #
     # FwaasV2 base class
@@ -138,6 +158,8 @@ class FeatureManager(traffic_manager.TrafficManager):
     def show_firewall_policy(self, policy_id):
         fw_policy = self.fwaas_v2_client.show_firewall_v2_policy(policy_id)
         return fw_policy
+=======
+>>>>>>> fbbfe8e... [QOS] Scenario tests based on new tempest design
 
     #
     # L2Gateway base class. To get basics of L2GW.
@@ -482,3 +504,121 @@ class FeatureManager(traffic_manager.TrafficManager):
             if port_info['port']['device_owner'] == "network:router_interface":
                 return port_info['port']['id']
         return None
+    #
+    # QoS base class. To get basics of QoS.
+    #
+    def get_qos_policy_id(self, policy_id_or_name):
+        policies = self.qos_policy_client.list_policies(name=policy_id_or_name)
+        policy_list = policies['policies']
+        if len(policy_list) > 0:
+            return policy_list[0]['id']
+        return policy_id_or_name
+
+    def create_qos_policy(self, name, description, shared, **kwargs):
+        result = self.qos_policy_client.create_policy(
+            name=name,
+            description=description,
+            shared=shared,
+            **kwargs
+        )
+        self.addCleanup(test_utils.call_and_ignore_notfound_exc,
+                        self.qos_policy_client.delete_policy,
+                        result['policy']['id'])
+        return result.get('policy', result)
+
+    def delete_qos_policy(self, policy_id):
+        result = self.qos_policy_client.delete_policy(policy_id)
+        return result.get('policy', result)
+
+    def list_qos_policies(self, **filters):
+        result = self.qos_policy_client.list_policies(**filters)
+        return result.get('policies', result)
+
+    def update_qos_policy(self, policy_id, **kwargs):
+        result = self.qos_policy_client.update_policy(policy_id, **kwargs)
+        return result.get('policy', result)
+
+    def show_qos_policy(self, policy_id, **fields):
+        result = self.qos_policy_client.show_policy(policy_id, **fields)
+        return result.get('policy', result)
+
+    #
+    # QoS bandwidth_limit
+    #
+    def create_bandwidth_limit_rule(self, policy_id,
+                                    max_kbps, max_burst_kbps,
+                                    **kwargs):
+        result = self.qos_bw_client.create_bandwidth_limit_rule(
+            policy_id,
+            max_kbps=max_kbps, max_burst_kbps=max_burst_kbps,
+            **kwargs)
+        self.addCleanup(test_utils.call_and_ignore_notfound_exc,
+            self.qos_bw_client.delete_bandwidth_limit_rule,
+            result['bandwidth_limit_rule']['id'], policy_id)
+        return result.get('bandwidth_limit_rule', result)
+
+    def delete_bandwidth_limit_rule(self, rule_id, policy_id):
+        result = self.qos_bw_client.delete_bandwidth_limit_rule(
+            rule_id, policy_id)
+        return result.get('bandwidth_limit_rule', result)
+
+    def update_bandwidth_limit_rule(self, rule_id, policy_id_or_name,
+                                    **kwargs):
+        policy_id = self.get_qos_policy_id(policy_id_or_name)
+        result = self.qos_bw_client.update_bandwidth_limit_rule(
+            rule_id, policy_id, **kwargs)
+        return result.get('bandwidth_limit_rule', result)
+
+    def list_bandwidth_limit_rules(self, policy_id, **filters):
+        result = self.qos_bw_client.list_bandwidth_limit_rules(
+            policy_id, **filters)
+        return result.get('bandwidth_limit_rules', result)
+
+    def show_bandwidth_limit_rule(self, rule_id, policy_id,
+                                  **fields):
+        result = self.qos_bw_client.show_bandwidth_limit_rule(
+            rule_id, policy_id)
+        return result.get('bandwidth_limit_rule', result)
+
+    #
+    # QoS DSCP Marking Rule
+    #
+    def create_dscp_marking_rule(self, policy_id, dscp_mark,
+                                 **kwargs):
+        policy_id = self.get_qos_policy_id(policy_id)
+        kwargs['dscp_mark'] = dscp_mark
+        result = self.qos_dscp_client.create_dscp_marking_rule(
+            policy_id, **kwargs)
+        self.addCleanup(test_utils.call_and_ignore_notfound_exc,
+            self.qos_dscp_client.delete_dscp_marking_rule,
+            result['dscp_marking_rule']['id'], policy_id)
+        return result.get('dscp_marking_rule', result)
+
+    def delete_dscp_marking_rule(self, rule_id, policy_id_or_name):
+        policy_id = self.get_qos_policy_id(policy_id_or_name)
+        result = self.qos_dscp_client.delete_dscp_marking_rule(rule_id,
+                                                            policy_id)
+        return result.get('dscp_marking_rule', result)
+
+    def update_dscp_marking_rule(self, rule_id, policy_id_or_name,
+                                 **kwargs):
+        policy_id = self.get_qos_policy_id(policy_id_or_name)
+        result = self.qos_dscp_client.update_dscp_marking_rule(
+            rule_id, policy_id, **kwargs)
+        return result.get('dscp_marking_rule', result)
+
+    def list_dscp_marking_rules(self, policy_id_or_name, **filters):
+        policy_id = self.get_qos_policy_id(policy_id_or_name)
+        result = self.qos_dscp_client.list_dscp_marking_rules(
+            policy_id, **filters)
+        return result.get('dscp_marking_rules', result)
+
+    def show_dscp_marking_rule(self, rule_id, policy_id_or_name, **fields):
+        policy_id = self.get_qos_policy_id(policy_id_or_name)
+        result = self.qos_dscp_client.show_dscp_marking_rule(
+            rule_id, policy_id, **fields)
+        return result.get('dscp_marking_rule', result)
+
+    def list_rule_types(self):
+        result = self.types_client.list_rule_types()
+        return result.get('rule_types', result)
