@@ -238,3 +238,124 @@ class TrafficManager(appliance_manager.ApplianceManager):
             raise exceptions.TimeoutException("Timed out while waiting to "
                                               "execute cmd %s on server. " %
                                               cmd)
+
+
+class IperfManager(TrafficManager):
+
+    def set_iperf_server(self, ssh_source, traffic_type=None):
+        # set up iperf server on VM
+        LOG.info("Setting up iperf server")
+        if traffic_type == 'udp':
+            cmd = ('iperf -p 49162 -s -u > /dev/null 2>&1 &')
+        else:
+            cmd = ('iperf -p 49162 -s  > /dev/null 2>&1 &')
+        ssh_source.exec_command(cmd)
+
+    def set_iperf_client(self, ssh_source, destination_ip,
+        traffic_send_rate, traffic_type=None):
+        """set up iperf client"""
+        if traffic_type == 'udp':
+            cmd = ('iperf -p 49162 -c %s -b %sM -t 1 -u | grep %%'
+                   % (unicode(destination_ip), unicode(traffic_send_rate)))
+        else:
+            cmd = ('iperf -p 49162 -c %s -b %sM -t 1 | grep %%'
+                   % (unicode(destination_ip), unicode(traffic_send_rate)))
+        output = ssh_source.exec_command(cmd)
+        return output
+
+    def kill_iperf_process(self, ssh_source):
+        """To kill iperf process on server"""
+        LOG.info("Killing iperf process")
+        cmd = ('ps -ef | grep iperf ')
+        output = ssh_source.exec_command(cmd)
+        for line in output.splitlines():
+            if 'iperf -p 49162 -s -u' not in line:
+                continue
+            else:
+                iperf_process_id = line.split()[1]
+                cmd = ('kill %s' % (unicode(iperf_process_id)))
+                ssh_source.exec_command(cmd)
+
+    def kill_tcpdump_process(self, ssh_source):
+        """To kill tcpdump process"""
+        LOG.info("Killing TCPDUMP process")
+        cmd = ('ps -ef | grep tcpdump')
+        output = ssh_source.exec_command(cmd)
+        for line in output.splitlines():
+            if 'tcpdump -ni eth0 -w' not in line:
+                continue
+            else:
+                tcpdump_process_id = line.split()[1]
+                cmd = ('kill %s' % (unicode(tcpdump_process_id)))
+                ssh_source.exec_command(cmd)
+
+    def use_iperf_send_traffic(
+            self, src_server, dst_server, send_rate, traffic_type=None):
+        """To send iperf traffic between src server and dst server
+        for udp traffic specify -u option, default is tcp for iperf traffic
+        """
+        src_ssh_source = self._get_remote_client(
+            ip_address=src_server["floating_ips"][0]["floating_ip_address"],
+            use_password=True)
+        dst_ssh_source = self._get_remote_client(
+            ip_address=dst_server["floating_ips"][0]["floating_ip_address"],
+            use_password=True)
+        # set up iperf server on destination VM
+        self.set_iperf_server(dst_ssh_source, traffic_type)
+        # set up iperf client on source VM
+        dst_fixed_ip = dst_server['floating_ips'][0]['fixed_ip_address']
+        traffic_send_rate = send_rate
+        output = self.set_iperf_client(src_ssh_source,
+                 dst_fixed_ip, traffic_send_rate, traffic_type)
+        bandwidth_value = output.split()[7]
+        # kill the iperf process on destination VM
+        self.kill_iperf_process(dst_ssh_source)
+        return bandwidth_value
+
+    def capture_iperf_traffic_dscp(
+            self, src_server, dst_server,
+            send_dscp, interface, traffic_type=None):
+        """To send iperf traffic between src server and dst server
+        for udp traffic specify -u option, default is tcp for iperf traffic
+        """
+        src_ssh_source = self._get_remote_client(
+            ip_address=src_server["floating_ips"][0]["floating_ip_address"],
+            use_password=True)
+        dst_ssh_source = self._get_remote_client(
+            ip_address=dst_server["floating_ips"][0]["floating_ip_address"],
+            use_password=True)
+        timestamp = time.strftime("%Y-%m-%d_%H:%M:%S")
+        dscp_filename = 'dscp_' + timestamp + '.pcap'
+        # To capture packets from interface
+        cmd = ('echo \"%s\" | sudo -S tcpdump -ni %s'
+               ' -w %s > /dev/null 2>&1 &'
+               % (CONF.validation.image_ssh_password,
+               interface, dscp_filename))
+        dst_ssh_source.exec_command(cmd)
+        # set up iperf server on destination VM
+        self.set_iperf_server(dst_ssh_source, traffic_type)
+        # set up iperf client on source VM
+        dst_fixed_ip = dst_server['floating_ips'][0]['fixed_ip_address']
+        traffic_send_rate = 1
+        self.set_iperf_client(src_ssh_source,
+             dst_fixed_ip, traffic_send_rate, traffic_type)
+        # Kill iperf process on destination VM
+        self.kill_iperf_process(dst_ssh_source)
+        # kill tcpdump process on destination VM
+        self.kill_tcpdump_process(src_ssh_source)
+        # To copy pcap (packet capture) file from destination VM to external VM
+        cmd = ('sshpass -p  \"%s\" scp -o StrictHostKeyChecking=no'
+               ' %s@%s:/home/%s/%s .'
+               % (CONF.validation.image_ssh_password,
+                 CONF.validation.image_ssh_user,
+                 dst_server['floating_ips'][0]['floating_ip_address'],
+                  CONF.validation.image_ssh_user, dscp_filename))
+        try:
+            subprocess.check_call(cmd, shell=True, executable='/bin/bash',
+                                  stderr=subprocess.STDOUT)
+        except Exception as e:
+            message = ('Failed to copy file from VM.'
+                       'Error: %(error)s' % {'error': e})
+            LOG.exception(message)
+            raise
+        return dscp_filename
