@@ -529,6 +529,8 @@ class ProviderSecurityGroupTest(base.BaseAdminNetworkTest):
             # when execute tempest in parallel fashion,
             # we create provider security group for other tests,
             # NSX will return all provider security group from DFW.
+            if section['applied_tos'][0]['target_type'] == "LogicalRouter":
+                continue
             if PROVIDER_SECURITY_GRP in section['display_name'] and \
                     provider_sg_name not in section['display_name']:
                 pass

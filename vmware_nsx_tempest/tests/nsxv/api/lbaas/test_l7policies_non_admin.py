@@ -136,7 +136,8 @@ class TestL7Policies(base.BaseTestCase):
         policy1A = self._show_l7policy(policy1.get('id'))
         self.assertEqual(policy1A.get('position'), 2)
         # create to_url_policy at position=2
-        policy3 = self.create_to_url_policy(to_position=2)
+        policy3 = self.create_to_url_policy(redirect_url='http://exaample.com',
+                                            to_position=2)
         self.assertEqual(policy3.get('position'), 2)
         policy2A = self._show_l7policy(policy2.get('id'))
         self.assertEqual(policy2A.get('position'), 1)
