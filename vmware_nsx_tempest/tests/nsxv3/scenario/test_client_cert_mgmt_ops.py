@@ -35,8 +35,8 @@ LOG = logging.getLogger(__name__)
 
 class TestCertificateMgmt(manager.NetworkScenarioTest):
 
-    error_message = ("Principal 'admin' from group 'superusers' attempts\
- to delete or modify an object it doesn't own")
+    error_msg = ["Principal \'admin\'",
+                 "attempts to delete or modify an object it doesn't own"]
 
     @classmethod
     def skip_checks(cls):
@@ -119,9 +119,11 @@ class TestCertificateMgmt(manager.NetworkScenarioTest):
         is unable to delete or modify openstack entities
         """
         msg = 'Error: NSX admin is able to modify/delete'
-        self.assertIn(self.error_message,
-            response.json()['error_message'], msg)
-        LOG.info('NSX admin is unable to modify/delete the openstack object')
+        if all(x in response.json()['error_message'] for x in self.error_msg):
+            LOG.info('NSX admin is unable to modify/delete '
+                'the openstack object')
+        else:
+            raise Exception(msg)
 
     def ca_topo(self):
         """
