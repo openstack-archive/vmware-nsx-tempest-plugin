@@ -15,9 +15,12 @@
 
 import time
 
+from neutron_lib import constants as nl_constants
+
 from tempest import config
 from tempest.lib.common.utils import data_utils
 from tempest.lib.common.utils import test_utils
+from tempest.lib import exceptions as lib_exc
 
 from vmware_nsx_tempest._i18n import _
 from vmware_nsx_tempest.common import constants
@@ -77,6 +80,64 @@ class FeatureManager(traffic_manager.TrafficManager):
         cls.members_client = members_client.get_client(cls.os_primary)
         cls.health_monitors_client = \
             health_monitors_client.get_client(cls.os_primary)
+        cls.fwaas_v2_client = openstack_network_clients.FwaasV2Client(
+            net_client.auth_provider,
+            net_client.service,
+            net_client.region,
+            net_client.endpoint_type,
+            **_params)
+
+    #
+    # FwaasV2 base class
+    #
+    def create_firewall_rule(self, **kwargs):
+        fw_rule = self.fwaas_v2_client.create_firewall_v2_rule(**kwargs)
+        self.addCleanup(
+            test_utils.call_and_ignore_notfound_exc,
+            self.fwaas_v2_client.delete_firewall_v2_rule,
+            fw_rule["firewall_rule"]["id"])
+        return fw_rule
+
+    def create_firewall_policy(self, **kwargs):
+        fw_policy = self.fwaas_v2_client.create_firewall_v2_policy(**kwargs)
+        self.addCleanup(
+            test_utils.call_and_ignore_notfound_exc,
+            self.fwaas_v2_client.delete_firewall_v2_policy,
+            fw_policy["firewall_policy"]["id"])
+        return fw_policy
+
+    def create_firewall_group(self, **kwargs):
+        fw_group = self.fwaas_v2_client.create_firewall_v2_group(**kwargs)
+        self.addCleanup(
+            test_utils.call_and_ignore_notfound_exc,
+            self.fwaas_v2_client.delete_firewall_v2_group,
+            fw_group["firewall_group"]["id"])
+        return fw_group
+
+    def update_firewall_group(self, group_id, **kwargs):
+        fw_group = self.fwaas_v2_client.update_firewall_v2_group(group_id,
+                                                                 **kwargs)
+        return fw_group
+
+    def update_firewall_policy(self, policy_id, **kwargs):
+        return self.fwaas_v2_client.update_firewall_v2_policy(policy_id,
+                                                              **kwargs)
+
+    def update_firewall_rule(self, rule_id, **kwargs):
+        return self.fwaas_v2_client.update_firewall_v2_rule(rule_id,
+                                                            **kwargs)
+
+    def show_firewall_group(self, group_id):
+        fw_group = self.fwaas_v2_client.show_firewall_v2_group(group_id)
+        return fw_group
+
+    def show_firewall_rule(self, rule_id):
+        fw_rule = self.fwaas_v2_client.show_firewall_v2_rule(rule_id)
+        return fw_rule
+
+    def show_firewall_policy(self, policy_id):
+        fw_policy = self.fwaas_v2_client.show_firewall_v2_policy(policy_id)
+        return fw_policy
 
     #
     # L2Gateway base class. To get basics of L2GW.
@@ -254,6 +315,26 @@ class FeatureManager(traffic_manager.TrafficManager):
             server = self.servers_details[server_name].server
             self.start_web_server(protocol_port, server, server_name)
 
+    def _wait_firewall_while(self, fw_group_id, statuses, not_found_ok=False):
+        if not_found_ok:
+            expected_exceptions = (lib_exc.NotFound)
+        else:
+            expected_exceptions = ()
+        while True:
+            try:
+                fw = self.show_firewall_group(fw_group_id)
+            except expected_exceptions:
+                break
+            status = fw['firewall_group']['status']
+            if status not in statuses:
+                break
+
+    def _wait_firewall_ready(self, fw_group_id):
+        time.sleep(constants.NSX_BACKEND_VERY_SMALL_TIME_INTERVAL)
+        self._wait_firewall_while(fw_group_id,
+                                  [nl_constants.PENDING_CREATE,
+                                   nl_constants.PENDING_UPDATE])
+
     def wait_for_load_balancer_status(self, lb_id):
         # Wait for load balancer become ONLINE and ACTIVE
         self.load_balancers_client.wait_for_load_balancer_status(lb_id)
@@ -392,3 +473,12 @@ class FeatureManager(traffic_manager.TrafficManager):
                                    port_id=self.loadbalancer['vip_port_id'])
         self.vip_ip_address = vip_fip['floating_ip_address']
         return self.vip_ip_address
+
+    def get_router_port(self, client):
+        """List ports using admin creds """
+        ports_list = client.list_ports()
+        for port in ports_list['ports']:
+            port_info = client.show_port(port['id'])
+            if port_info['port']['device_owner'] == "network:router_interface":
+                return port_info['port']['id']
+        return None
