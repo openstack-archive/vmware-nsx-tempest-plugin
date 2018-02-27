@@ -81,9 +81,15 @@ class ApplianceManager(manager.NetworkScenarioTest):
         self._verify_empty_security_group_status(security_group)
         return security_group
 
-    def add_security_group_rule(self, security_group, rule):
-        return self._create_security_group_rule(secgroup=security_group,
-                                                **rule)
+    def add_security_group_rule(self, security_group, rule,
+                                ruleclient=None,
+                                tenant_id=None, secclient=None):
+        return self._create_security_group_rule(
+            secgroup=security_group,
+            tenant_id=tenant_id,
+            sec_group_rules_client=ruleclient,
+            security_groups_client=secclient,
+            **rule)
 
     def get_server_key(self, server):
         return self.topology_keypairs[server['key_name']]['private_key']
@@ -196,6 +202,36 @@ class ApplianceManager(manager.NetworkScenarioTest):
                 routers_client.remove_router_interface, router_id,
                 subnet_id=subnet["id"])
         return subnet
+
+    def create_topology_security_provider_group(
+            self, client=None, project_id=None, provider=False):
+        if client is None:
+            sg_client_admin = self.security_groups_client
+        else:
+            sg_client_admin = client.security_groups_client
+        sg_dict = dict(name=data_utils.rand_name('provider-sec-group'))
+        if project_id:
+            sg_dict['tenant_id'] = project_id
+        if provider:
+            sg_dict['provider'] = True
+        sg = sg_client_admin.create_security_group(**sg_dict)
+        sg = sg.get('security_group', sg)
+        self.addCleanup(test_utils.call_and_ignore_notfound_exc,
+                        sg_client_admin.delete_security_group,
+                        sg.get('id'))
+        return sg
+
+    def _get_port_id(self, network_id, subnet_id, instance):
+        _, instance_addr = instance["addresses"].items()[0]
+        instance_fixed_ip = instance_addr[0]["addr"]
+        for port in self._list_ports():
+            port_fixed_ip = port["fixed_ips"][0]["ip_address"]
+            if port["network_id"] == network_id and port["fixed_ips"][0][
+                    "subnet_id"] == subnet_id and instance["id"] == port[
+                    "device_id"] and port_fixed_ip == instance_fixed_ip:
+                port_id = port["id"]
+        self.assertIsNotNone(port_id, "Failed to find Instance's port id!!!")
+        return port_id
 
     def create_topology_security_group(self, **kwargs):
         return self._create_security_group(**kwargs)

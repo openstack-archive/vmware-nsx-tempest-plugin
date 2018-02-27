@@ -260,13 +260,14 @@ class IperfManager(TrafficManager):
         ssh_source.exec_command(cmd)
 
     def set_iperf_client(self, ssh_source, destination_ip,
-        traffic_send_rate='1', traffic_duration='1'):
+                         traffic_send_rate='1', traffic_duration='1'):
         """set up iperf client"""
+
         if self.traffic == 'udp':
             cmd = ('iperf -p 49162 -c %s -b %sM -t 1 -u | grep %%'
                    % (unicode(destination_ip), unicode(traffic_send_rate)))
         else:
-            cmd = ('iperf -p 49162 -c %s -b %sM -t 1 | grep %%'
+            cmd = ('iperf -p 49162 -c %s -b %sM -t 1 '
                    % (unicode(destination_ip), unicode(traffic_send_rate)))
         output = ssh_source.exec_command(cmd)
         if output is None or float(output.split()[7]) < 0:
@@ -298,7 +299,7 @@ class IperfManager(TrafficManager):
                 ssh_source.exec_command(cmd)
 
     def use_iperf_send_traffic(
-            self, src_server, dst_server, send_rate, traffic_type):
+            self, src_server, dst_server, send_rate=None, traffic_type=None):
         """To send iperf traffic between src server and dst server
         and capture the received traffic at the destination
         """
@@ -313,8 +314,13 @@ class IperfManager(TrafficManager):
         # set up iperf client on source VM
         dst_fixed_ip = dst_server['floating_ips'][0]['fixed_ip_address']
         traffic_send_rate = send_rate
-        bandwidth_value = self.set_iperf_client(src_ssh_source,
-                 dst_fixed_ip, traffic_send_rate)
+        # To make sure connection esxtablished properly
+        try:
+            bandwidth_value = self.set_iperf_client(
+                src_ssh_source, dst_fixed_ip, traffic_send_rate, traffic_type)
+        except BaseException:
+            self.kill_iperf_process(dst_ssh_source)
+            return ''
         # kill the iperf process on destination VM
         self.kill_iperf_process(dst_ssh_source)
         return bandwidth_value
@@ -337,14 +343,14 @@ class IperfManager(TrafficManager):
         cmd = ('echo \"%s\" | sudo -S tcpdump -ni %s'
                ' -w %s > /dev/null 2>&1 &'
                % (CONF.validation.image_ssh_password,
-               interface, dscp_filename))
+                  interface, dscp_filename))
         dst_ssh_source.exec_command(cmd)
         # set up iperf server on destination VM
         self.set_iperf_server(dst_ssh_source, traffic_type)
         # set up iperf client on source VM
         dst_fixed_ip = dst_server['floating_ips'][0]['fixed_ip_address']
         self.set_iperf_client(src_ssh_source,
-             dst_fixed_ip)
+                              dst_fixed_ip)
         # Kill iperf process on destination VM
         self.kill_iperf_process(dst_ssh_source)
         # kill tcpdump process on destination VM
@@ -353,8 +359,8 @@ class IperfManager(TrafficManager):
         cmd = ('sshpass -p  \"%s\" scp -o StrictHostKeyChecking=no'
                ' %s@%s:/home/%s/%s .'
                % (CONF.validation.image_ssh_password,
-                 CONF.validation.image_ssh_user,
-                 dst_server['floating_ips'][0]['floating_ip_address'],
+                  CONF.validation.image_ssh_user,
+                  dst_server['floating_ips'][0]['floating_ip_address'],
                   CONF.validation.image_ssh_user, dscp_filename))
         try:
             subprocess.check_call(cmd, shell=True, executable='/bin/bash',
