@@ -88,3 +88,14 @@ class NSXClient(object):
             #TODO(dkandavarajay) define else for NSXV
             pass
         return None
+
+    def get_audit_log_info(self, obj_id):
+        """
+        Retrieve audit log information for openstack user
+        """
+        if self.backend == "nsxv3":
+            output = self.nsx.get_audit_log(obj_id)
+            return output
+        else:
+            pass
+        return None
