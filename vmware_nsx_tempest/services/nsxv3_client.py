@@ -531,6 +531,22 @@ class NSXV3Client(object):
         response = self.get(endpoint)
         return response.json()
 
+    def get_audit_log(self, pattern):
+        """
+        Obtain audit log from mgmt plane
+        log_age_limit include logs not past the age limit in days
+        log_filter audit logs should meet the filter cond
+        log_filter_type type of log filter
+        :return log message relevant to the object id
+        """
+        body = {}
+        endpoint = "/administration/audit-logs?page_size=100"
+        body['log_age_limit'] = 1
+        body['log_filter'] = pattern
+        body['log_filter_type'] = "TEXT"
+        response = self.post(endpoint, body)
+        return response.json()
+
     def get_openstack_client_certificate(self):
         """
         Get self signed openstack client certificate
