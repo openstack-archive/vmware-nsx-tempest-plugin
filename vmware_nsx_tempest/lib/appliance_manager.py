@@ -108,8 +108,23 @@ class ApplianceManager(manager.NetworkScenarioTest):
             network_id=self.topology_public_network_id)}
         routers_client.update_router(router['id'], **public_network_info)
         self.topology_routers[router_name] = router
-        self.addCleanup(self.routers_client.delete_router, router['id'])
+        self.addCleanup(test_utils.call_and_ignore_notfound_exc,
+                        self.routers_client.delete_router, router['id'])
         return router
+
+    def update_topology_router(
+            self, router_id, routers_client=None, **update_kwargs):
+        if not routers_client:
+            routers_client = self.routers_client
+        result = routers_client.update_router(router_id,
+                 **update_kwargs)
+        return result
+
+    def delete_topology_router(
+            self, router_id, routers_client=None):
+        if not routers_client:
+            routers_client = self.routers_client
+        routers_client.delete_router(router_id)
 
     def create_topology_network(
             self, network_name, networks_client=None,
@@ -133,6 +148,20 @@ class ApplianceManager(manager.NetworkScenarioTest):
                         networks_client.delete_network, network['id'])
         self.topology_networks[network_name] = network
         return network
+
+    def update_topology_network(
+            self, network_id, networks_client=None, **update_kwargs):
+        if not networks_client:
+            networks_client = self.networks_client
+        result = networks_client.update_network(network_id,
+                 **update_kwargs)
+        return result
+
+    def delete_topology_network(
+            self, network_id, networks_client=None):
+        if not networks_client:
+            networks_client = self.networks_client
+        networks_client.delete_network(network_id)
 
     def create_topology_subnet(
             self, subnet_name, network, routers_client=None,
@@ -235,6 +264,16 @@ class ApplianceManager(manager.NetworkScenarioTest):
 
     def create_topology_security_group(self, **kwargs):
         return self._create_security_group(**kwargs)
+
+    def update_topology_security_group(self, sg_id, client=None,
+                                       **updated_kwargs):
+        sg = self.security_groups_client.update_security_group(sg_id,
+             **updated_kwargs)
+        return sg
+
+    def delete_topology_security_group(self, sg_id, client=None):
+        sg = self.security_groups_client.delete_security_group(sg_id)
+        return sg
 
     def _get_server_portid_and_ip4(self, server, ip_addr=None):
         ports = self.os_admin.ports_client.list_ports(
@@ -372,3 +411,18 @@ class ApplianceManager(manager.NetworkScenarioTest):
                 break
         self.assertIsNotNone(image_id, msg)
         return image_id
+
+    def get_user_id(self, client_id):
+        """
+        Get the user id based on the openstack client
+        """
+        if client_id == 'network':
+            user_id = self.networks_client.user_id
+            tenant_id = self.networks_client.tenant_id
+        elif client_id == 'router':
+            user_id = self.routers_client.user_id
+            tenant_id = self.routers_client.tenant_id
+        elif client_id == 'sg':
+            user_id = self.security_groups_client.user_id
+            tenant_id = self.security_groups_client.tenant_id
+        return user_id, tenant_id
