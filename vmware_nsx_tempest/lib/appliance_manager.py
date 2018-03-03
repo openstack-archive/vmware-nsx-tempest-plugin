@@ -134,6 +134,14 @@ class ApplianceManager(manager.NetworkScenarioTest):
         self.topology_networks[network_name] = network
         return network
 
+    def update_topology_network(
+            self, network_id, networks_client=None, **update_kwargs):
+        if not networks_client:
+            networks_client = self.networks_client
+        result = networks_client.update_network(network_id,
+                 **update_kwargs)
+        return result 
+
     def create_topology_subnet(
             self, subnet_name, network, routers_client=None,
             subnets_client=None, router_id=None, ip_version=4, cidr=None,
@@ -372,3 +380,12 @@ class ApplianceManager(manager.NetworkScenarioTest):
                 break
         self.assertIsNotNone(image_id, msg)
         return image_id
+
+    def get_user_id(self, client_id):
+        """
+        Get the user id based on the openstack client
+        """
+        if client_id == 'network':
+            user_id = self.networks_client.user_id
+            tenant_id = self.networks_client.tenant_id
+        return user_id, tenant_id
