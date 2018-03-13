@@ -95,7 +95,7 @@ class ApplianceManager(manager.NetworkScenarioTest):
         return self.topology_keypairs[server['key_name']]['private_key']
 
     def create_topology_router(self, router_name, routers_client=None,
-                               tenant_id=None, **kwargs):
+                               tenant_id=None, set_gateway=True, **kwargs):
         if not routers_client:
             routers_client = self.routers_client
         if not tenant_id:
@@ -104,9 +104,10 @@ class ApplianceManager(manager.NetworkScenarioTest):
         name = data_utils.rand_name(router_name_)
         router = routers_client.create_router(
             name=name, admin_state_up=True, tenant_id=tenant_id)['router']
-        public_network_info = {"external_gateway_info": dict(
-            network_id=self.topology_public_network_id)}
-        routers_client.update_router(router['id'], **public_network_info)
+        if set_gateway is not False:
+            public_network_info = {"external_gateway_info": dict(
+                network_id=self.topology_public_network_id)}
+            routers_client.update_router(router['id'], **public_network_info)
         self.topology_routers[router_name] = router
         self.addCleanup(self.routers_client.delete_router, router['id'])
         return router
@@ -255,6 +256,23 @@ class ApplianceManager(manager.NetworkScenarioTest):
                             "No IPv4 addresses found in: %s" % ports)
         return port_map
 
+    def remove_router_interface(
+            self,
+            router_id,
+            subnet_id,
+            router_client=None):
+        if router_client is None:
+            router_client = self.routers_client
+        router_client.remove_router_interface(router_id,
+                                              subnet_id=subnet_id)
+
+    def update_subnet(self, subnet_id, subnet_client=None, **kwargs):
+        if subnet_client is None:
+            subnet_client = self.subnets_client
+        result = subnet_client.update_subnet(subnet_id, **kwargs)
+        subnet = result['subnet']
+        return subnet
+
     def create_floatingip(self, thing, port_id, external_network_id=None,
                           ip4=None, client=None):
         """Create a floating IP and associates to a resource/port on Neutron"""
@@ -291,7 +309,11 @@ class ApplianceManager(manager.NetworkScenarioTest):
         else:
             kwargs["config_drive"] = config_drive
         if not keypair:
-            keypair = self.create_keypair()
+            if clients:
+                client = clients.keypairs_client
+                keypair = self.create_keypair(client)
+            else:
+                keypair = self.create_keypair()
             self.topology_keypairs[keypair['name']] = keypair
             kwargs["key_name"] = keypair['name']
         else:
