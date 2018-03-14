@@ -504,6 +504,98 @@ class FeatureManager(traffic_manager.IperfManager):
                 return port_info['port']['id']
         return None
 
+    # Vlan backed Tier-1 router operations
+    def check_downlink_port_created(self, router_op, subnet, port_id):
+        tag_hit = 0
+        backend_rtr_id = ''
+        all_routers = self.nsx.get_logical_routers()
+        for router in all_routers:
+            if router_op['name'] in router.get('display_name'):
+                backend_rtr_id = router['id']
+                rtr = {'id': backend_rtr_id}
+                break
+        if backend_rtr_id:
+            logical_rtr_ports = self.nsx.get_logical_router_ports(rtr)
+            for ports in logical_rtr_ports:
+                for rtr_tag in ports.get('tags'):
+                    if rtr_tag['scope'] == "os-neutron-rport-id" and \
+                            rtr_tag['tag'] == port_id:
+                        tag_hit += 1
+                        continue
+                    if rtr_tag['scope'] == "os-subnet-id" and subnet['id'] == \
+                            rtr_tag['tag']:
+                        tag_hit += 1
+                        ports_info = ports
+                        break
+            if tag_hit == 2:
+                if ports_info.get('resource_type') \
+                        == 'LogicalRouterDownLinkPort':
+                    ip_address = ports_info.get('subnets')[
+                        0].get('ip_addresses')
+                    if ip_address:
+                        if not self.\
+                            cmgr_adm.subnets_client.show_subnet(
+                                subnet['id']).get('subnet')[
+                                'gateway_ip'] == ip_address[0]:
+                            raise RuntimeError(
+                                "Router centralized port ip doesn't "
+                                "match with openstack subnet "
+                                "gatewayip")
+                        else:
+                            pass
+            else:
+                raise RuntimeError(
+                    "Router_port_id and subnet_id doesn't match at "
+                    "the backend")
+        else:
+            raise RuntimeError("Router not created at the backend properly")
+
+    def check_centralized_port_created(self, router_op, subnet, port_id):
+        tag_hit = 0
+        backend_rtr_id = ''
+        all_routers = self.nsx.get_logical_routers()
+        for router in all_routers:
+            if router_op['name'] in router.get('display_name'):
+                backend_rtr_id = router['id']
+                rtr = {'id': backend_rtr_id}
+                break
+        if backend_rtr_id:
+            logical_rtr_ports = self.nsx.get_logical_router_ports(rtr)
+            for ports in logical_rtr_ports:
+                for rtr_tag in ports.get('tags'):
+                    if rtr_tag['scope'] == "os-neutron-rport-id" and \
+                            rtr_tag['tag'] == port_id:
+                        tag_hit += 1
+                        continue
+                    if rtr_tag['scope'] == "os-subnet-id" and subnet['id'] == \
+                            rtr_tag['tag']:
+                        tag_hit += 1
+                        ports_info = ports
+                        break
+            if tag_hit == 2:
+                if ports_info.get(
+                        'resource_type') \
+                        == 'LogicalRouterCentralizedServicePort':
+                    ip_address = ports_info.get('subnets')[
+                        0].get('ip_addresses')
+                    if ip_address:
+                        if not self.cmgr_adm.subnets_client.\
+                                show_subnet(subnet['id']).\
+                                get('subnet')[
+                                'gateway_ip'] == ip_address[0]:
+                            raise RuntimeError(
+                                "Router centralized port ip doesn't "
+                                "match with openstack subnet "
+                                "gatewayip")
+                    else:
+                        pass
+            else:
+                raise RuntimeError(
+                    "Router_port_id and subnet_id doesn't match at "
+                    "the backend")
+        else:
+            raise RuntimeError("Router not created at the backend properly")
+
     #
     # QoS base class. To get basics of QoS.
     #
@@ -553,8 +645,8 @@ class FeatureManager(traffic_manager.IperfManager):
             max_kbps=max_kbps, max_burst_kbps=max_burst_kbps,
             **kwargs)
         self.addCleanup(test_utils.call_and_ignore_notfound_exc,
-            self.qos_bw_client.delete_bandwidth_limit_rule,
-            result['bandwidth_limit_rule']['id'], policy_id)
+                        self.qos_bw_client.delete_bandwidth_limit_rule,
+                        result['bandwidth_limit_rule']['id'], policy_id)
         return result.get('bandwidth_limit_rule', result)
 
     def delete_bandwidth_limit_rule(self, rule_id, policy_id):
@@ -590,14 +682,14 @@ class FeatureManager(traffic_manager.IperfManager):
         result = self.qos_dscp_client.create_dscp_marking_rule(
             policy_id, **kwargs)
         self.addCleanup(test_utils.call_and_ignore_notfound_exc,
-            self.qos_dscp_client.delete_dscp_marking_rule,
-            result['dscp_marking_rule']['id'], policy_id)
+                        self.qos_dscp_client.delete_dscp_marking_rule,
+                        result['dscp_marking_rule']['id'], policy_id)
         return result.get('dscp_marking_rule', result)
 
     def delete_dscp_marking_rule(self, rule_id, policy_id_or_name):
         policy_id = self.get_qos_policy_id(policy_id_or_name)
         result = self.qos_dscp_client.delete_dscp_marking_rule(rule_id,
-                                                            policy_id)
+                                                               policy_id)
         return result.get('dscp_marking_rule', result)
 
     def update_dscp_marking_rule(self, rule_id, policy_id_or_name,
