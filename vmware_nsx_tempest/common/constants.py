@@ -65,7 +65,7 @@ TIME = {"SEC": {"SIXTY": 60}}
 
 VLAN_TYPE = 'vlan'
 VXLAN_TYPE = 'geneve'
-VLAN = 1001
+VLAN = 2099
 
 NO_OF_VMS_2 = 2
 NO_OF_VMS_4 = 4
