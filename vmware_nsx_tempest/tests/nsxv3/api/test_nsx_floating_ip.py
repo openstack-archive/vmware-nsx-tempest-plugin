@@ -76,7 +76,7 @@ class NSXv3FloatingIPTest(base.BaseNetworkTest):
                   {'router': nsx_router, 'rules': nat_rules})
         dnat_rules = [(rule['translated_network'],
                        rule['match_destination_network']) for rule in nat_rules
-                      if 'match_destination_network' in rule]
+                      if rule['action'] == 'DNAT']
         snat_rules = [(rule['translated_network'],
                        rule['match_source_network']) for rule in nat_rules
                       if 'match_source_network' in rule]
@@ -114,7 +114,7 @@ class NSXv3FloatingIPTest(base.BaseNetworkTest):
                   {'router': nsx_router, 'rules': nat_rules})
         dnat_rules = [(rule['translated_network'],
                        rule['match_destination_network']) for rule in nat_rules
-                      if 'match_destination_network' in rule]
+                      if rule['action'] == 'DNAT']
         snat_rules = [(rule['translated_network'],
                        rule['match_source_network']) for rule in nat_rules
                       if 'match_source_network' in rule]
@@ -149,7 +149,7 @@ class NSXv3FloatingIPTest(base.BaseNetworkTest):
                   {'router': nsx_router, 'rules': nat_rules})
         dnat_rules = [(rule['translated_network'],
                        rule['match_destination_network']) for rule in nat_rules
-                      if 'match_destination_network' in rule]
+                      if rule['action'] == 'DNAT']
         snat_rules = [(rule['translated_network'],
                        rule['match_source_network']) for rule in nat_rules
                       if 'match_source_network' in rule]
