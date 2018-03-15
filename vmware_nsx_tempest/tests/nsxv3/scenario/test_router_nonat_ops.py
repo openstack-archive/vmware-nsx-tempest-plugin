@@ -273,7 +273,10 @@ class TestRouterNoNATOps(manager.NetworkScenarioTest):
         router_adv = self.nsx.get_logical_router_advertisement(nsx_router)
         adv_msg = "Tier1 router's advertise_nsx_connected_routes is not True"
         nat_msg = "Tier1 router's advertise_nat_routes is not False"
-        self.assertTrue(len(nat_rules) == 3)
+        if any(d['action'] == 'NO_DNAT' for d in nat_rules):
+            self.assertTrue(len(nat_rules) == 4)
+        else:
+            self.assertTrue(len(nat_rules) == 3)
         self.assertTrue(router_adv['advertise_nat_routes'], nat_msg)
         self.assertFalse(router_adv['advertise_nsx_connected_routes'], adv_msg)
         self._check_network_internal_connectivity(network=self.network)
@@ -296,7 +299,10 @@ class TestRouterNoNATOps(manager.NetworkScenarioTest):
         nat_rules = self.nsx.get_logical_router_nat_rules(nsx_router)
         # Check router advertisement is correctly set
         router_adv = self.nsx.get_logical_router_advertisement(nsx_router)
-        self.assertTrue(len(nat_rules) == 0)
+        if len(nat_rules) == 1:
+            self.assertTrue(any(d['action'] == 'NO_DNAT' for d in nat_rules))
+        else:
+            self.assertTrue(len(nat_rules) == 0)
         self.assertFalse(router_adv['advertise_nat_routes'], nat_msg)
         self.assertTrue(router_adv['advertise_nsx_connected_routes'], adv_msg)
         self._check_nonat_network_connectivity()
@@ -315,7 +321,10 @@ class TestRouterNoNATOps(manager.NetworkScenarioTest):
         router_adv = self.nsx.get_logical_router_advertisement(nsx_router)
         adv_msg = "Tier1 router's advertise_nsx_connected_routes is not True"
         nat_msg = "Tier1 router's advertise_nat_routes is not False"
-        self.assertTrue(len(nat_rules) == 0)
+        if len(nat_rules) == 1:
+            self.assertTrue(any(d['action'] == 'NO_DNAT' for d in nat_rules))
+        else:
+            self.assertTrue(len(nat_rules) == 0)
         self.assertFalse(router_adv['advertise_nat_routes'], nat_msg)
         self.assertTrue(router_adv['advertise_nsx_connected_routes'], adv_msg)
         self._check_nonat_network_connectivity()
@@ -335,7 +344,10 @@ class TestRouterNoNATOps(manager.NetworkScenarioTest):
         nat_rules = self.nsx.get_logical_router_nat_rules(nsx_router)
         # Check router advertisement is correctly set
         router_adv = self.nsx.get_logical_router_advertisement(nsx_router)
-        self.assertTrue(len(nat_rules) == 3)
+        if any(d['action'] == 'NO_DNAT' for d in nat_rules):
+            self.assertTrue(len(nat_rules) == 4)
+        else:
+            self.assertTrue(len(nat_rules) == 3)
         self.assertTrue(router_adv['advertise_nat_routes'], nat_msg)
         self.assertFalse(router_adv['advertise_nsx_connected_routes'], adv_msg)
         self._check_network_internal_connectivity(network=self.network)
