@@ -83,6 +83,9 @@ class ScenarioTest(tempest.test.BaseTestCase):
         if CONF.volume_feature_enabled.api_v2:
             cls.volumes_client = cls.os_primary.volumes_v2_client
             cls.snapshots_client = cls.os_primary.snapshots_v2_client
+        elif CONF.volume_feature_enabled.api_v3:
+            cls.volumes_client = cls.os_primary.volumes_v3_client
+            cls.snapshots_client = cls.os_primary.snapshots_v3_client
         else:
             cls.volumes_client = cls.os_primary.volumes_client
             cls.snapshots_client = cls.os_primary.snapshots_client
