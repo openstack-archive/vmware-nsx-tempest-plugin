@@ -434,7 +434,7 @@ class FeatureManager(traffic_manager.IperfManager):
 
     def create_project_lbaas(self, protocol_type, protocol_port, lb_algorithm,
                              hm_type, member_count=2, max_vms=None,
-                             weight=None):
+                             weight=None, fip_disassociate=None):
         count = 0
         vip_subnet_id = self.topology_subnets["subnet_lbaas_1"]['id']
         lb_name = data_utils.rand_name(self.namestart)
@@ -466,7 +466,8 @@ class FeatureManager(traffic_manager.IperfManager):
             if count < member_count:
                 fip_data = self.servers_details[server_name].floating_ips[0]
                 fixed_ip_address = fip_data['fixed_ip_address']
-                self._disassociate_floating_ip(fip_data)
+                if fip_disassociate is None:
+                    self._disassociate_floating_ip(fip_data)
                 if weight:
                     weight += count
                     member = self.members_client.create_member(
