@@ -102,6 +102,37 @@ class NSXv3SecGroupTest(base.BaseSecGroupTest):
         return nsx_nsgroup, nsx_dfw_section
 
     @decorators.attr(type='nsxv3')
+    @decorators.idempotent_id('105ca2c6-a14e-448b-b227-a7366e611bf2')
+    def test_create_sec_group_with_0_0_0_0_remote_ip_prefix(self):
+        # Create a security group
+        group_create_body, name = self._create_security_group()
+        secgroup = group_create_body['security_group']
+        dfw_error_msg = "Firewall section not found for %s!" % secgroup['name']
+        nsx_nsgroup, nsx_dfw_section = \
+            self._wait_till_firewall_gets_realize(secgroup, dfw_error_msg)
+        client = self.security_group_rules_client
+        rule_create_body = client.create_security_group_rule(
+            security_group_id=secgroup['id'],
+            protocol='tcp',
+            direction='ingress',
+            port_range_min=22,
+            port_range_max=23,
+            ethertype=self.ethertype,
+            remote_ip_prefix='0.0.0.0/0',
+        )
+        secgroup_rule = rule_create_body['security_group_rule']
+        nsx_dfw_rule = self.nsx.get_firewall_section_rule(
+            nsx_dfw_section,
+            secgroup_rule['id'])
+        self.assertIsNotNone(nsx_dfw_rule)
+        # Delete the security group rule
+        client.delete_security_group_rule(secgroup_rule['id'])
+        nsx_dfw_rule = self.nsx.get_firewall_section_rule(
+            nsx_dfw_section,
+            secgroup_rule['id'])
+        self.assertIsNone(nsx_dfw_rule)
+
+    @decorators.attr(type='nsxv3')
     @decorators.idempotent_id('904ca2c1-a14d-448b-b723-a7366e613bf1')
     def test_create_update_nsx_security_group(self):
         # Create a security group
