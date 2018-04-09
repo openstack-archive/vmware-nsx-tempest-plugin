@@ -61,7 +61,6 @@ class PortTypeTest(base.BaseAdminNetworkTest):
         LOG.debug("create FLAT network: %s", str(post_body))
         body = self.admin_networks_client.create_network(**post_body)
         network = body['network']
-        self.networks.append(network)
         if _auto_clean_up:
             self.addCleanup(test_utils.call_and_ignore_notfound_exc,
                             self.delete_network, network['id'])
