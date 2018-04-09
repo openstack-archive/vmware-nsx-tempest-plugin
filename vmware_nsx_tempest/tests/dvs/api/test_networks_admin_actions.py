@@ -62,7 +62,6 @@ class AdminNetworksTestJSON(base.BaseDvsAdminNetworkTest):
         # Remove subnet from cleanup list
         self.subnets.pop()
         body = self.delete_network(net_id)
-        self.networks.pop()
 
     @decorators.attr(type='smoke')
     @decorators.idempotent_id('15d3d53c-3328-401f-b8f5-3a29aee2ea3a')
@@ -89,7 +88,6 @@ class AdminNetworksTestJSON(base.BaseDvsAdminNetworkTest):
         # Remove subnet from cleanup list
         self.subnets.pop()
         body = self.delete_network(net_id)
-        self.networks.pop()
 
     @decorators.attr(type='smoke')
     @decorators.idempotent_id('838aee5f-92f2-47b9-86c6-629a04aa6269')
