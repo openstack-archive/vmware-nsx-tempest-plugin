@@ -31,12 +31,10 @@ class BaseDvsAdminNetworkTest(base.BaseAdminNetworkTest):
             cls.admin_ports_client.delete_port(port['id'])
         for subnet in cls.subnets:
             cls.admin_subnets_client.delete_subnet(subnet['id'])
-        for network in cls.networks:
-            cls.admin_networks_client.delete_network(network['id'])
         # clean up ports, subnets and networks
         cls.ports = []
         cls.subnets = []
-        cls.networks = []
+        super(BaseDvsAdminNetworkTest, cls).resource_cleanup()
 
     @classmethod
     def create_network(cls, **kwargs):
@@ -54,7 +52,6 @@ class BaseDvsAdminNetworkTest(base.BaseAdminNetworkTest):
 
             body = cls.admin_networks_client.create_network(**body)
         network = body['network']
-        cls.networks.append(network)
         return network
 
     @classmethod
