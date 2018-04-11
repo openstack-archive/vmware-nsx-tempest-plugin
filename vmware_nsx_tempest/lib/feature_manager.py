@@ -25,6 +25,7 @@ from tempest.lib import exceptions as lib_exc
 from vmware_nsx_tempest._i18n import _
 from vmware_nsx_tempest.common import constants
 from vmware_nsx_tempest.lib import traffic_manager
+from vmware_nsx_tempest.services import designate_base
 from vmware_nsx_tempest.services.lbaas import health_monitors_client
 from vmware_nsx_tempest.services.lbaas import listeners_client
 from vmware_nsx_tempest.services.lbaas import load_balancers_client
@@ -43,7 +44,8 @@ RULE_TYPE_DSCP_MARK = "dscp_marking"
 
 
 # It includes feature related function such CRUD Mdproxy, L2GW or QoS
-class FeatureManager(traffic_manager.IperfManager):
+class FeatureManager(traffic_manager.IperfManager,
+                     designate_base.DnsClientBase):
     @classmethod
     def setup_clients(cls):
         """Create various client connections. Such as NSXv3 and L2 Gateway.
@@ -102,6 +104,13 @@ class FeatureManager(traffic_manager.IperfManager):
             net_client.endpoint_type,
             **_params)
         cls.qos_dscp_client = openstack_network_clients.QosDscpClient(
+            net_client.auth_provider,
+            net_client.service,
+            net_client.region,
+            net_client.endpoint_type,
+            **_params)
+        net_client.service = 'dns'
+        cls.zones_v2_client = openstack_network_clients.ZonesV2Client(
             net_client.auth_provider,
             net_client.service,
             net_client.region,
@@ -715,3 +724,103 @@ class FeatureManager(traffic_manager.IperfManager):
     def list_rule_types(self):
         result = self.types_client.list_rule_types()
         return result.get('rule_types', result)
+
+    #
+    # Designate Zone
+    #
+    def rand_zone_name(name='', prefix=None, suffix='.com.'):
+        """Generate a random zone name
+        :param str name: The name that you want to include
+        :param prefix: the exact text to start the string. Defaults to "rand"
+        :param suffix: the exact text to end the string
+        :return: a random zone name e.g. example.org.
+        :rtype: string
+        """
+        name = 'tempest'
+        name = data_utils.rand_name(name=name, prefix=prefix)
+        zone_name = name + suffix
+        return zone_name
+
+    def rand_email(self, zone_name):
+        """Generate a random zone name
+        :return: a random zone name e.g. example.org.
+        :rtype: string
+        """
+        email_id = 'example@%s' % str(zone_name).rstrip('.')
+        return email_id
+
+    def create_zone(self, name=None, email=None, description=None,
+                    wait_until=False):
+        """Create a zone with the specified parameters.
+        :param name: The name of the zone.
+            Default: Random Value
+        :param email: The email for the zone.
+            Default: Random Value
+        :param ttl: The ttl for the zone.
+            Default: Random Value
+        :param description: A description of the zone.
+            Default: Random Value
+        :param wait_until: Block until the zone reaches the desired status
+        :return: A tuple with the server response and the created zone.
+        """
+        if name is None:
+            name = self.rand_zone_name()
+        zone = {
+            'name': name,
+            'email': email or self.rand_email(name),
+            'description': description or data_utils.rand_name('test-zone'),
+        }
+        _, body = self.zones_v2_client.create_zone(wait_until, **zone)
+        self.addCleanup(test_utils.call_and_ignore_notfound_exc,
+                        self.delete_zone, body['id'])
+        # Create Zone should Return a HTTP 202
+        return body
+
+    def delete_zone(self, uuid):
+        """Deletes a zone having the specified UUID.
+        :param uuid: The unique identifier of the zone.
+        :return: A tuple with the server response and the response body.
+        """
+        _, body = self.zones_v2_client.delete_zone(uuid)
+        return body
+
+    def show_zone(self, uuid):
+        """Gets a specific zone.
+        :param uuid: Unique identifier of the zone in UUID format.
+        :return: Serialized zone as a dictionary.
+        """
+        return self.zones_v2_client.show_zone(uuid)
+
+    def list_zones(self):
+        """Gets a list of zones.
+        :return: Serialized zones as a list.
+        """
+        return self.zones_v2_client.list_zones()
+
+    def update_zone(self, uuid, email=None, ttl=None,
+                    description=None, wait_until=False):
+        """Update a zone with the specified parameters.
+        :param uuid: The unique identifier of the zone.
+        :param email: The email for the zone.
+            Default: Random Value
+        :param ttl: The ttl for the zone.
+            Default: Random Value
+        :param description: A description of the zone.
+            Default: Random Value
+        :param wait_until: Block until the zone reaches the desiered status
+        :return: A tuple with the server response and the updated zone.
+        """
+        zone = {
+            'email': email or self.rand_email(),
+            'ttl': ttl or self.rand_ttl(),
+            'description': description or self.rand_name('test-zone'),
+        }
+        _, body = self.zones_v2_client.update_zone(uuid, wait_until, **zone)
+        return body
+
+    def list_record_set_zone(self, uuid):
+        """list recordsets of a zone.
+        :param uuid: The unique identifier of the zone.
+        """
+        body = self.zones_v2_client.list_recordset_zone(uuid)
+        return body
