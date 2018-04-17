@@ -125,6 +125,8 @@ class ApplianceManager(manager.NetworkScenarioTest):
         # config before trying to create the network with port_security_enabled
         if CONF.network_feature_enabled.port_security:
             port_security_enabled = True
+        else:
+            port_security_enabled = False
         result = networks_client.create_network(
             name=name, tenant_id=tenant_id,
             port_security_enabled=port_security_enabled, **kwargs)
@@ -297,12 +299,13 @@ class ApplianceManager(manager.NetworkScenarioTest):
             config_drive=None, keypair=None, image_id=None,
             clients=None, create_floating_ip=True, **kwargs):
         # Define security group for server.
-        if security_groups:
-            kwargs["security_groups"] = security_groups
-        else:
-            _sg = self.create_topology_security_group()
-            _security_groups = [{'name': _sg['name']}]
-            kwargs["security_groups"] = _security_groups
+        if CONF.nsxv3.ens is not True:
+            if security_groups:
+                kwargs["security_groups"] = security_groups
+            else:
+                _sg = self.create_topology_security_group()
+                _security_groups = [{'name': _sg['name']}]
+                kwargs["security_groups"] = _security_groups
         # Define config drive for server.
         if not config_drive:
             kwargs["config_drive"] = self.topology_config_drive

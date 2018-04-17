@@ -196,4 +196,8 @@ NSXv3Group = [
     cfg.BoolOpt('native_dhcp_metadata',
                 default=False,
                 help="Enable or disable Native DHCP and MDProxy for nsxv3"),
+    cfg.BoolOpt('ens',
+                default=False,
+                help="enable ens based changes like port-security-disabled"
+                     " no security-group"),
 ]
