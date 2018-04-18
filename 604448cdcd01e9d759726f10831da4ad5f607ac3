@@ -1,0 +1,9 @@
+Code-Review+1: Christopher Chu Lin <cchulin@vmware.com>
+Code-Review+2: Devang Doshi <ddoshi@vmware.com>
+Workflow+1: Devang Doshi <ddoshi@vmware.com>
+Verified+2: Zuul
+Submitted-by: Zuul
+Submitted-at: Wed, 18 Apr 2018 23:38:41 +0000
+Reviewed-on: https://review.openstack.org/562058
+Project: openstack/vmware-nsx-tempest-plugin
+Branch: refs/heads/master
