@@ -25,7 +25,6 @@ from tempest.lib import exceptions as lib_exc
 from vmware_nsx_tempest._i18n import _
 from vmware_nsx_tempest.common import constants
 from vmware_nsx_tempest.lib import traffic_manager
-from vmware_nsx_tempest.services import designate_base
 from vmware_nsx_tempest.services.lbaas import health_monitors_client
 from vmware_nsx_tempest.services.lbaas import listeners_client
 from vmware_nsx_tempest.services.lbaas import load_balancers_client
@@ -44,8 +43,7 @@ RULE_TYPE_DSCP_MARK = "dscp_marking"
 
 
 # It includes feature related function such CRUD Mdproxy, L2GW or QoS
-class FeatureManager(traffic_manager.IperfManager,
-                     designate_base.DnsClientBase):
+class FeatureManager(traffic_manager.IperfManager):
     @classmethod
     def setup_clients(cls):
         """Create various client connections. Such as NSXv3 and L2 Gateway.
@@ -109,10 +107,9 @@ class FeatureManager(traffic_manager.IperfManager,
             net_client.region,
             net_client.endpoint_type,
             **_params)
-        net_client.service = 'dns'
         cls.zones_v2_client = openstack_network_clients.ZonesV2Client(
             net_client.auth_provider,
-            net_client.service,
+            'dns',
             net_client.region,
             net_client.endpoint_type,
             **_params)

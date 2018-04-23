@@ -201,3 +201,12 @@ NSXv3Group = [
                 help="enable ens based changes like port-security-disabled"
                      " no security-group"),
 ]
+
+dns_group = cfg.OptGroup(name='dns',
+                         title="DNS Configuration Options")
+
+DNSGroup = [
+    cfg.StrOpt('nameservers',
+               default='',
+               help="DNS Nameserver IP address"),
+]

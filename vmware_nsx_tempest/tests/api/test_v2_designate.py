@@ -17,7 +17,6 @@ from oslo_log import log as logging
 from tempest import config
 from tempest.lib.common.utils import data_utils
 from tempest.lib import decorators
-from tempest import test
 
 from vmware_nsx_tempest.lib import feature_manager
 
@@ -32,9 +31,6 @@ class TestZonesV2Ops(feature_manager.FeatureManager):
     @classmethod
     def skip_checks(cls):
         super(TestZonesV2Ops, cls).skip_checks()
-        if not test.is_extension_enabled('designate', 'network'):
-            msg = "Extension designate is not enabled."
-            raise cls.skipException(msg)
 
     @classmethod
     def setup_credentials(cls):
