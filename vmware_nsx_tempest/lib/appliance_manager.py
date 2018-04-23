@@ -333,6 +333,12 @@ class ApplianceManager(manager.NetworkScenarioTest):
                         floating_ip['id'])
         return floating_ip
 
+    def delete_floatingip(self, floating_ip, client=None):
+        """Delete floating IP associated to a resource/port on Neutron"""
+        if not client:
+            client = self.os_admin.floating_ips_client
+        client.delete_floatingip(floating_ip['id'])
+
     def create_topology_instance(
             self, server_name, networks, security_groups=None,
             config_drive=None, keypair=None, image_id=None,
@@ -397,6 +403,11 @@ class ApplianceManager(manager.NetworkScenarioTest):
         self.topology_servers[server_name] = server
         return server
 
+    def delete_topology_instance(self, server, servers_client=None):
+        if not servers_client:
+            servers_client = self.os_admin.servers_client
+        servers_client.delete_server(server['id'])
+
     def _list_ports(self, *args, **kwargs):
         """List ports using admin creds """
         ports_list = self.os_admin.ports_client.list_ports(
@@ -451,3 +462,11 @@ class ApplianceManager(manager.NetworkScenarioTest):
             user_id = self.security_groups_client.user_id
             tenant_id = self.security_groups_client.tenant_id
         return user_id, tenant_id
+
+    def create_topology_port(self, network,
+        ports_client=None, **args):
+        if not ports_client:
+            ports_client = self.ports_client
+        port = ports_client.create_port(network_id=network['id'], **args)
+        self.addCleanup(ports_client.delete_port, port['port']['id'])
+        return port
