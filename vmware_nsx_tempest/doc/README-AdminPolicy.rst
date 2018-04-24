@@ -9,7 +9,7 @@ able to create security-group-policy.
 
 This feature can be enabled from devstack or manually.
 
-Enable security-group-policy extention at bring up devstack
+Enable security-group-policy extension at bring up devstack
 ===========================================================
 
 You can enable security-group-policy when starting up devstack.
@@ -23,7 +23,7 @@ To enable it, add the following tokens to local.conf:
 
 Change values according to your needs though.
 
-Enable security-group-policy extention manually
+Enable security-group-policy extension manually
 ===============================================
 
 Instruction is from the view of devstack
