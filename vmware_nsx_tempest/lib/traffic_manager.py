@@ -22,6 +22,7 @@ import urllib3
 from oslo_log import log as logging
 
 from tempest.common.utils.linux import remote_client
+from tempest.common import waiters
 from tempest import config
 from tempest import exceptions
 from tempest.lib.common.utils import test_utils
@@ -44,6 +45,15 @@ class TrafficManager(appliance_manager.ApplianceManager):
         for remote_ip in address_list:
             self.check_remote_connectivity(ssh_source, remote_ip,
                                            should_succeed=should_connect)
+
+    def wait_server_status(self, client, server_id, state='ACTIVE'):
+        if client is None:
+            servers_client = self.servers_client
+        else:
+            servers_client = client
+        waiters.wait_for_server_status(servers_client, server_id,
+                                       state)
+        time.sleep(60)
 
     def check_network_internal_connectivity(
             self, network, floating_ip, server, should_connect=True):
