@@ -138,7 +138,7 @@ class NetworkTagAddTest(BaseTagsTest):
     @decorators.attr(type='negative')
     def test_add_tag_empty_one(self):
         network_id = self.net.get('id')
-        self.assertRaises(exceptions.NotFound,
+        self.assertRaises(exceptions.BadRequest,
                           self.network_add_tag,
                           network_id, '')
 
