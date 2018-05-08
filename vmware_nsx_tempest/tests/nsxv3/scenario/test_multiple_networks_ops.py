@@ -163,10 +163,10 @@ class TestMultiNetworksOps(manager.NetworkScenarioTest):
         floating_ip, server = self.floating_ip_tuple
         # test connectivity on the network
         network_ips = (p['fixed_ips'][0]['ip_address'] for p in
-                       self._list_ports(tenant_id=server['tenant_id'],
-                                        network_id=network['id'])
-                       if (p['device_owner'].startswith('network') or
-                           p['device_owner'].startswith('compute')))
+            self._list_ports(tenant_id=server['tenant_id'],
+                             network_id=network['id'])
+            if (p['device_owner'].startswith('network:router_interface') or
+                p['device_owner'].startswith('compute')))
         self._check_server_connectivity(floating_ip,
                                         network_ips,
                                         should_connect)
