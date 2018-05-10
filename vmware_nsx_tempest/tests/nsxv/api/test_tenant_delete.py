@@ -18,28 +18,32 @@ import subprocess
 
 from oslo_log import log as logging
 import six
+
+from tempest.api.identity import base
 from tempest import config
 from tempest.lib.common.utils import data_utils
 from tempest.lib.common.utils import test_utils
 from tempest.lib import decorators
 
-from vmware_nsx_tempest.tests.nsxv.api import base_provider as base
+from vmware_nsx_tempest.tests.nsxv.api import base_provider as base_p
 
 CONF = config.CONF
 LOG = logging.getLogger(__name__)
 
 
-class ProjectDeleteTest(base.BaseAdminNetworkTest):
+class ProjectDeleteTest(base_p.BaseAdminNetworkTest,
+                        base.BaseIdentityV3AdminTest):
     """Check Purge network resources using tenant-Id.
 
     Validate that network resources which are not in use should get
     deleted once neutron purge <tenant-id> is called.
     """
+
     @classmethod
     def skip_checks(cls):
         super(ProjectDeleteTest, cls).skip_checks()
-        if not (CONF.network.project_networks_reachable
-                or CONF.network.public_network_id):
+        if not (CONF.network.project_networks_reachable or
+                CONF.network.public_network_id):
             msg = ('Either project_networks_reachable must be "true", or '
                    'public_network_id must be defined.')
             raise cls.skipException(msg)
@@ -121,35 +125,46 @@ class ProjectDeleteTest(base.BaseAdminNetworkTest):
         nets[net_id] = (network, subnet)
         router_type = 'shared'
         self.create_router_and_add_interfaces(router_type, nets)
-        uri = CONF.identity.uri
+        uri = CONF.identity.uri_v3
+        os.environ['OS_IDENTITY_API_VERSION'] = '3'
+        os.environ['OS_AUTH_TYPE'] = 'password'
+        os.environ['OS_PROJECT_DOMAIN_NAME'] = 'local'
+        os.environ['OS_USER_DOMAIN_NAME'] = 'local'
         os.environ['OS_AUTH_URL'] = uri
         os.environ['OS_REGION_NAME'] = 'nova'
         os.environ['OS_USERNAME'] = CONF.auth.admin_username
         os.environ['OS_TENANT_NAME'] = CONF.auth.admin_project_name
         os.environ['OS_PASSWORD'] = CONF.auth.admin_password
         name = data_utils.rand_name('tenant-delete-')
-        tenant = self.admin_manager.tenants_client.create_tenant(name=name)
+        tenant = self.projects_client.create_project(name=name)
         username = name + 'user'
-        kwargs = {'name': username, 'pass': 'password'}
-        tenant_user = self.admin_manager.users_client.create_user(**kwargs)
-        os.environ['OS_USERNAME'] = tenant_user['user']['username']
-        os.environ['OS_TENANT_NAME'] = tenant['tenant']['name']
+        kwargs = {'name': username, 'pass': 'password',
+                  'project_id': tenant['project']['id']}
+        tenant_user = self.users_client.create_user(**kwargs)
+        os.environ['OS_USERNAME'] = tenant_user['user']['name']
+        os.environ['OS_TENANT_NAME'] = tenant['project']['name']
         os.environ['OS_PASSWORD'] = 'password'
         local_tenant_id = network['tenant_id']
+        projects_list = self.projects_client.list_projects(
+            params={'name': 'admin'})['projects']
+        admin_tenant_id =\
+            [p['id'] for p in projects_list
+             if p['description'] == 'Admin Project']
         purge_output =\
-            os.popen('neutron --insecure purge %s --tenant-id=%s' %
-                     (local_tenant_id,
-                      tenant['tenant']['id'])).read().strip()
-        self.assertEqual(purge_output, '')
+            subprocess.Popen('neutron --insecure purge %s --tenant-id=%s' %
+                     (local_tenant_id, tenant['project']['id']), shell=True,
+                                       stdout=subprocess.PIPE,
+                                       stderr=subprocess.STDOUT).stdout.read()
+        self.assertIn('The request you have made requires authentication',
+                      purge_output)
         os.environ['OS_USERNAME'] = CONF.auth.admin_username
         os.environ['OS_TENANT_NAME'] = CONF.auth.admin_project_name
         os.environ['OS_PASSWORD'] = CONF.auth.admin_password
-        admin_tenant_id = os.popen(
-            "openstack --insecure project list | grep admin | awk '{print $2}'")\
-            .read()
         purge_output =\
-            os.popen('neutron --insecure purge %s --tenant-id=%s' %
-                     (local_tenant_id, admin_tenant_id)).read().strip()
+            subprocess.Popen('neutron --insecure purge %s --tenant-id=%s' %
+                     (local_tenant_id, admin_tenant_id), shell=True,
+                                       stdout=subprocess.PIPE,
+                                       stderr=subprocess.STDOUT).stdout.read()
         self.assertIn('Purging resources: 100% complete', purge_output)
 
     @decorators.idempotent_id('77ec7045-f8f0-4aa1-8e1d-68c0647fda89')
@@ -159,22 +174,32 @@ class ProjectDeleteTest(base.BaseAdminNetworkTest):
         create_kwargs = dict(name=name)
         network = network_client.create_network(**create_kwargs)
         network_client.delete_network(network['network']['id'])
-        uri = CONF.identity.uri
-        os.environ['OS_AUTH_URL'] = uri
         os.environ['OS_REGION_NAME'] = 'nova'
         os.environ['OS_USERNAME'] = CONF.auth.admin_username
         os.environ['OS_TENANT_NAME'] = CONF.auth.admin_project_name
         os.environ['OS_PASSWORD'] = CONF.auth.admin_password
+        uri = CONF.identity.uri_v3
+        os.environ['OS_IDENTITY_API_VERSION'] = '3'
+        os.environ['OS_AUTH_TYPE'] = 'password'
+        os.environ['OS_PROJECT_DOMAIN_NAME'] = 'local'
+        os.environ['OS_USER_DOMAIN_NAME'] = 'local'
+        os.environ['OS_AUTH_URL'] = uri
         local_tenant_id = network['network']['tenant_id']
-        admin_tenant_id = os.popen(
-            "openstack --insecure project list | grep admin | awk '{print $2}'")\
-            .read()
+        projects_list = self.projects_client.list_projects(
+            params={'name': 'admin'})['projects']
+        admin_tenant_id =\
+            [p['id'] for p in projects_list
+             if p['description'] == 'Admin Project']
         purge_output =\
-            os.popen('neutron --insecure purge %s --tenant-id=%s' %
-                     (local_tenant_id, admin_tenant_id)).read().strip()
+            subprocess.Popen('neutron --insecure purge %s --tenant-id=%s' %
+                     (local_tenant_id, admin_tenant_id), shell=True,
+                                       stdout=subprocess.PIPE,
+                                       stderr=subprocess.STDOUT).stdout.read()
         purge_output =\
-            os.popen('neutron --insecure purge %s --tenant-id=%s' %
-                     (local_tenant_id, admin_tenant_id)).read().strip()
+            subprocess.Popen('neutron --insecure purge %s --tenant-id=%s' %
+                     (local_tenant_id, admin_tenant_id), shell=True,
+                                       stdout=subprocess.PIPE,
+                                       stderr=subprocess.STDOUT).stdout.read()
         LOG.debug("create VLAN network: %s", (purge_output))
         check_output = 'Tenant has no supported resources'
         self.assertIn(check_output, purge_output)
@@ -195,7 +220,11 @@ class ProjectDeleteTest(base.BaseAdminNetworkTest):
         floatingip_client = self.admin_manager.floating_ips_client
         create_kwargs = {'floating_network_id': CONF.network.public_network_id}
         floatingip = floatingip_client.create_floatingip(**create_kwargs)
-        uri = CONF.identity.uri
+        uri = CONF.identity.uri_v3
+        os.environ['OS_IDENTITY_API_VERSION'] = '3'
+        os.environ['OS_AUTH_TYPE'] = 'password'
+        os.environ['OS_PROJECT_DOMAIN_NAME'] = 'local'
+        os.environ['OS_USER_DOMAIN_NAME'] = 'local'
         os.environ['OS_AUTH_URL'] = uri
         os.environ['OS_REGION_NAME'] = 'nova'
         os.environ['OS_USERNAME'] = CONF.auth.admin_username
@@ -203,12 +232,16 @@ class ProjectDeleteTest(base.BaseAdminNetworkTest):
         os.environ['OS_PASSWORD'] = CONF.auth.admin_password
         self.admin_networks_client
         local_tenant_id = network['tenant_id']
-        admin_tenant_id = os.popen(
-            "openstack --insecure project list | grep admin | awk '{print $2}'")\
-            .read()
+        projects_list = self.projects_client.list_projects(
+            params={'name': 'admin'})['projects']
+        admin_tenant_id =\
+            [p['id'] for p in projects_list
+             if p['description'] == 'Admin Project']
         purge_output =\
-            os.popen('neutron --insecure purge %s --tenant-id=%s' %
-                     (local_tenant_id, admin_tenant_id)).read().strip()
+            subprocess.Popen('neutron --insecure purge %s --tenant-id=%s' %
+                     (local_tenant_id, admin_tenant_id), shell=True,
+                                       stdout=subprocess.PIPE,
+                                       stderr=subprocess.STDOUT).stdout.read()
         LOG.debug("create VLAN network: %s", (purge_output))
         check_output = ("Deleted 2 security_groups, 1 router, 1 network, "
                         "1 floatingip")
@@ -240,7 +273,11 @@ class ProjectDeleteTest(base.BaseAdminNetworkTest):
         s_network = resp.get('network', resp)
         net_subnets = s_network['subnets']
         self.assertIn(subnet['id'], net_subnets)
-        uri = CONF.identity.uri
+        uri = CONF.identity.uri_v3
+        os.environ['OS_IDENTITY_API_VERSION'] = '3'
+        os.environ['OS_AUTH_TYPE'] = 'password'
+        os.environ['OS_PROJECT_DOMAIN_NAME'] = 'local'
+        os.environ['OS_USER_DOMAIN_NAME'] = 'local'
         os.environ['OS_AUTH_URL'] = uri
         os.environ['OS_REGION_NAME'] = 'nova'
         os.environ['OS_USERNAME'] = CONF.auth.admin_username
@@ -248,12 +285,16 @@ class ProjectDeleteTest(base.BaseAdminNetworkTest):
         os.environ['OS_PASSWORD'] = CONF.auth.admin_password
         self.admin_networks_client
         local_tenant_id = network['tenant_id']
-        cmd = ("openstack --insecure project list |"
-               " grep admin | awk '{print $2}'")
-        admin_tenant_id = os.popen(cmd).read()
+        projects_list = self.projects_client.list_projects(
+            params={'name': 'admin'})['projects']
+        admin_tenant_id =\
+            [p['id'] for p in projects_list
+             if p['description'] == 'Admin Project']
         purge_output =\
-            os.popen('neutron --insecure purge %s --tenant-id=%s' %
-                     (local_tenant_id, admin_tenant_id)).read().strip()
+            subprocess.Popen('neutron --insecure purge %s --tenant-id=%s' %
+                     (local_tenant_id, admin_tenant_id), shell=True,
+                                       stdout=subprocess.PIPE,
+                                       stderr=subprocess.STDOUT).stdout.read()
         check_output = 'Deleted 1 security_group, 1 network'
         self.assertIn(check_output, purge_output)
         check_output = 'The following resources could not be deleted: 1 port'
