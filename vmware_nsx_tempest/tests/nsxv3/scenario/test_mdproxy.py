@@ -163,7 +163,7 @@ class TestMDProxy(feature_manager.FeatureManager):
             "server_mdproxy_1", [network_mdproxy_1])
         network_mdproxy_2 = self.create_topology_network("network_mdproxy_2")
         self.create_topology_subnet("subnet_web_2", network_mdproxy_2,
-            router_id=router_mdproxy["id"])
+                                    router_id=router_mdproxy["id"])
         self.create_topology_instance("server_mdproxy_2", [network_mdproxy_2])
 
     def metadata_test_on_various_glance_image(self, image_id):
