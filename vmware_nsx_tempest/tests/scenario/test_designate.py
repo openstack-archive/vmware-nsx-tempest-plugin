@@ -248,7 +248,7 @@ class TestZonesScenario(TestZonesV2Ops):
             **post_body)
         fip = self.create_floatingip(port['port'], port['port']['id'],
             client=self.os_admin.floating_ips_client)
-        time.sleep(120)
+        time.sleep(200)
         LOG.info('Show recordset of the zone')
         recordset = self.list_record_set_zone(zone['id'])
         self.verify_recordset(recordset, 3)
@@ -283,6 +283,8 @@ class TestZonesScenario(TestZonesV2Ops):
         my_resolver = dns.resolver.Resolver()
         nameserver = CONF.dns.nameservers[:-3]
         my_resolver.nameservers = [nameserver]
+        #wait for status to change from pending to active
+        time.sleep(200)
         try:
             answer = my_resolver.query(record['name'])
         except Exception:
@@ -323,6 +325,6 @@ class TestZonesScenario(TestZonesV2Ops):
         self.assertEqual('DELETE', body['action'])
         self.assertEqual('PENDING', body['status'])
         # sleep for delete zone to change from PENDING to SUCCESS
-        time.sleep(100)
+        time.sleep(200)
         self.assertRaises(lib_exc.NotFound, self.delete_zone,
                           zone['id'])
