@@ -508,6 +508,34 @@ class NSXV3Client(object):
         dhcp_servers = self.get_logical_dhcp_servers()
         return self.get_nsx_resource_by_name(dhcp_servers, nsx_name)
 
+    def get_dpd_profiles(self):
+        endpoint = "/vpn/ipsec/dpd-profiles"
+        return self.get_logical_resources(endpoint)
+
+    def get_ike_profiles(self):
+        endpoint = "/vpn/ipsec/ike-profiles"
+        return self.get_logical_resources(endpoint)
+
+    def get_ipsec_profiles(self):
+        endpoint = "/vpn/ipsec/sessions"
+        return self.get_logical_resources(endpoint)
+
+    def get_vpn_services(self):
+        endpoint = "/vpn/ipsec/services"
+        return self.get_logical_resources(endpoint)
+
+    def get_tunnel_profiles(self):
+        endpoint = "/vpn/ipsec/tunnel-profiles"
+        return self.get_logical_resources(endpoint)
+
+    def get_peer_endpoints(self):
+        endpoint = "/vpn/ipsec/peer-endpoints"
+        return self.get_logical_resources(endpoint)
+
+    def get_local_endpoints(self):
+        endpoint = "/vpn/ipsec/local-endpoints"
+        return self.get_logical_resources(endpoint)
+
     def get_dhcp_server_static_bindings(self, dhcp_server):
         """
         Get all DHCP static bindings of a logical DHCP server

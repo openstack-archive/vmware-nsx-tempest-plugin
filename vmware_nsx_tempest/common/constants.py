@@ -77,3 +77,14 @@ REJECT = "REJECT"
 
 # ZONE Designate
 ZONE_WAIT_TIME = 120
+#VPN
+PEER_ID = "172.24.4.12"
+PFS = "group14"
+ENCRYPTION_ALGO = "aes-128"
+ENCRYPTION_ALGO_256 = "aes-256"
+AUTH_ALGO = "sha1"
+AUTH_ALGO_256 = "sha256"
+LIFETIME = {"units": "seconds", "value": 21600}
+PEER_ADDRESS = "172.24.4.12"
+SITE_CONNECTION_STATE = 'True'
+PSK = "secret"
