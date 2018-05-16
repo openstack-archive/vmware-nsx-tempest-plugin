@@ -22,6 +22,7 @@ from tempest import config
 from tempest.lib import decorators
 from tempest.lib import exceptions as lib_exc
 
+from vmware_nsx_tempest.common import constants as const
 from vmware_nsx_tempest.lib import feature_manager
 
 
@@ -95,14 +96,14 @@ class TestZonesV2Ops(feature_manager.FeatureManager):
             raise Exception('ERROR: NS record is absent')
         if any(record['type'] == 'SOA'
                for record in record_set[1]['recordsets']):
-            LOG.info('SOA record if present')
+            LOG.info('SOA record is present')
         else:
             LOG.error('SOA record is missing')
             raise Exception('ERROR: SOA record is absent')
         if count == 3:
             if any(record['type'] == 'A'
                    for record in record_set[1]['recordsets']):
-                LOG.info('A record if present')
+                LOG.info('A record is present')
             else:
                 LOG.error('A record is missing')
                 raise Exception('ERROR: A record is absent')
@@ -248,11 +249,12 @@ class TestZonesScenario(TestZonesV2Ops):
             **post_body)
         fip = self.create_floatingip(port['port'], port['port']['id'],
             client=self.os_admin.floating_ips_client)
-        time.sleep(120)
+        time.sleep(const.ZONE_WAIT_TIME)
         LOG.info('Show recordset of the zone')
         recordset = self.list_record_set_zone(zone['id'])
         self.verify_recordset(recordset, 3)
-        record = self.verify_recordset_floatingip(recordset, fip)
+        record = self.verify_recordset_floatingip(recordset,
+            fip['floating_ip_address'])
         if record is None:
             raise Exception('fip is missing in the recordset')
 
@@ -283,6 +285,8 @@ class TestZonesScenario(TestZonesV2Ops):
         my_resolver = dns.resolver.Resolver()
         nameserver = CONF.dns.nameservers[:-3]
         my_resolver.nameservers = [nameserver]
+        #wait for status to change from pending to active
+        time.sleep(const.ZONE_WAIT_TIME)
         try:
             answer = my_resolver.query(record['name'])
         except Exception:
@@ -323,6 +327,6 @@ class TestZonesScenario(TestZonesV2Ops):
         self.assertEqual('DELETE', body['action'])
         self.assertEqual('PENDING', body['status'])
         # sleep for delete zone to change from PENDING to SUCCESS
-        time.sleep(100)
+        time.sleep(const.ZONE_WAIT_TIME)
         self.assertRaises(lib_exc.NotFound, self.delete_zone,
                           zone['id'])

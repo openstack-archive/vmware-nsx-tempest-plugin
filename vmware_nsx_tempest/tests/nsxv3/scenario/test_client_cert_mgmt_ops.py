@@ -299,7 +299,7 @@ class TestCertificateMgmtOps(TestCertificateMgmt):
         self.parse_response(response)
         #try to delete logical firewall rule as NSX admin
         if len(fw_rules) != 0:
-            component = 'firewall/sections/' + data['id'] + '/rules/'
+            component = 'firewall/sections/' + data['id'] + '/rules'
             response = self.nsx.ca_delete_request(component=component,
                 comp_id=fw_rules[0]['id'])
             self.parse_response(response)
