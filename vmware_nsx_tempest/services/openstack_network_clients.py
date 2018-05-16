@@ -104,6 +104,133 @@ class L2GatewayConnectionClient(base.BaseNetworkClient):
         return self.list_resources(uri, **filters)
 
 
+class VPNClient(base.BaseNetworkClient):
+    """
+    Request resources via API for VPNaaS
+        vpn service reate request
+        vpn service update request
+        vpn ike policy create request
+        vpn ike policy update request
+        vpn ipsec policy create request
+        vpn ipsec policy update request
+        vpn site conection create request
+        vpn site connection  update request
+        l2 gateway connection list all request
+    """
+    endpoint_groups_path = "/vpn/endpoint-groups"
+    endpoint_group_path = "/vpn/endpoint-groups/%s"
+    vpnservices_path = "/vpn/vpnservices"
+    vpnservice_path = "/vpn/vpnservices/%s"
+    ipsecpolicies_path = "/vpn/ipsecpolicies"
+    ipsecpolicy_path = "/vpn/ipsecpolicies/%s"
+    ikepolicies_path = "/vpn/ikepolicies"
+    ikepolicy_path = "/vpn/ikepolicies/%s"
+    ipsec_site_connections_path = "/vpn/ipsec-site-connections"
+    ipsec_site_connection_path = "/vpn/ipsec-site-connections/%s"
+
+    def list_vpnservices(self, **filters):
+        """Fetches a list of all configured VPNServices for a tenant."""
+        return self.list_resources(self.vpnservices_path, **filters)
+
+    def create_vpnservice(self, **kwargs):
+        """Creates a new VPNService."""
+        return self.create_resource(self.vpnservices_path, kwargs)
+
+    def update_vpnservice(self, vpnservice_id, **kwargs):
+        """Updates a VPNService."""
+        uri = self.vpnservice_path % vpnservice_id
+        return self.update_resource(uri, kwargs)
+
+    def update_ipsec_site_connections(self, endpoint_id, **kwargs):
+        """Updates a VPN endpoint group."""
+        uri = self.ipsec_site_connection_path % endpoint_id
+        return self.update_resource(uri, kwargs)
+
+    def update_ikepolicy(self, ikepolicy_id, **kwargs):
+        """Updates an IKEPolicy."""
+        uri = self.ikepolicy_path % ikepolicy_id
+        return self.update_resource(uri, kwargs)
+
+    def update_ipsecpolicy(self, ipsecpolicy_id, **kwargs):
+        uri = self.ipsecpolicy_path % ipsecpolicy_id
+        return self.update_resource(uri, kwargs)
+
+    def show_ikepolicy(self, ikepolicy_id):
+        """Fetches information of a specific IKEPolicy."""
+        uri = self.ikepolicy_path % ikepolicy_id
+        return self.show_resource(uri)
+
+    def show_vpnservice(self, vpnservice_id):
+        """Fetches information of a specific VPNService."""
+        uri = self.vpnservice_path % (vpnservice_id)
+        return self.show_resource(uri)
+
+    def show_ipsecpolicy(self, ipsecpolicy_id):
+        uri = self.ipsecpolicy_path % ipsecpolicy_id
+        return self.show_resource(uri)
+
+    def show_ipsec_site_connections(self, endpoint_id):
+        """Updates a VPN endpoint group."""
+        uri = self.ipsec_site_connection_path % endpoint_id
+        return self.show_resource(uri)
+
+    def delete_vpnservice(self, vpnservice_id):
+        """Deletes the specified VPNService."""
+        uri = self.vpnservice_path % (vpnservice_id)
+        self.delete_resource(uri)
+
+    def delete_ikepolicy(self, ikepolicy_id):
+        """Deletes the specified IKEPolicy."""
+        uri = self.ikepolicy_path % ikepolicy_id
+        self.delete_resource(uri)
+
+    def delete_ipsecpolicy(self, ipsecpolicy_id):
+        """Deletes the specified IPsecPolicy."""
+        uri = self.ipsecpolicy_path % (ipsecpolicy_id)
+        self.delete_resource(uri)
+
+    def list_ipsec_site_connections(self, retrieve_all=True, **_params):
+        """Fetches all configured IPsecSiteConnections for a tenant."""
+        return self.list('ipsec_site_connections',
+                         self.ipsec_site_connections_path,
+                         retrieve_all,
+                         **_params)
+
+    def show_ipsec_site_connection(self, ipsecsite_conn, **_params):
+        """Fetches information of a specific IPsecSiteConnection."""
+        return self.get(
+            self.ipsec_site_connection_path % (ipsecsite_conn), params=_params
+        )
+
+    def delete_ipsec_site_connection(self, ipsecsite_conn):
+        """Deletes the specified IPsecSiteConnection."""
+        uri = self.ipsec_site_connection_path % (ipsecsite_conn)
+        return self.delete_resource(uri)
+
+    def list_ikepolicies(self, retrieve_all=True, **_params):
+        """Fetches a list of all configured IKEPolicies for a tenant."""
+        return self.list('ikepolicies', self.ikepolicies_path, retrieve_all,
+                         **_params)
+
+    def create_ikepolicy(self, **kwargs):
+        """Creates a new VPNService."""
+        return self.create_resource(self.ikepolicies_path, kwargs)
+
+    def create_ipsecpolicy(self, **kwargs):
+        return self.create_resource(self.ipsecpolicies_path, kwargs)
+
+    def create_ipsec_site_connection(self, **kwargs):
+        """Creates a new VPN endpoint group."""
+        return self.create_resource(self.ipsec_site_connections_path, kwargs)
+
+    def list_ipsecpolicies(self, retrieve_all=True, **_params):
+        """Fetches a list of all configured IPsecPolicies for a tenant."""
+        return self.list('ipsecpolicies',
+                         self.ipsecpolicies_path,
+                         retrieve_all,
+                         **_params)
+
+
 class FwaasV2Client(base.BaseNetworkClient):
     """
     Request resources via API for FwaasV2Client
@@ -311,6 +438,8 @@ class ZonesV2Client(designate_base.DnsClientBase):
         zonesv2 show zone
         zonesv2 list zones
     """
+    resource = 'zone'
+    resource_plural = 'policies'
     path = 'zones'
     resource_base_path = '/v2/%s' % path
 
@@ -341,8 +470,3 @@ class ZonesV2Client(designate_base.DnsClientBase):
 
     def list_zones(self):
         return self._list_request(self.resource_base_path)
-
-    def list_recordset_zone(self, zone_id):
-        request = self.resource_base_path + '/' + zone_id + '/recordsets'
-        resp, body = self._list_request(request)
-        return resp, body

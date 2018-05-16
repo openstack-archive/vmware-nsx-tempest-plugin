@@ -105,12 +105,17 @@ class ApplianceManager(manager.NetworkScenarioTest):
         router = routers_client.create_router(
             name=name, admin_state_up=True, tenant_id=tenant_id)['router']
         if set_gateway is not False:
-            public_network_info = {"external_gateway_info": dict(
-                network_id=self.topology_public_network_id)}
+            if kwargs["enable_snat"] is not None:
+                public_network_info = {"external_gateway_info": dict(
+                    network_id=self.topology_public_network_id,
+                    enable_snat=kwargs["enable_snat"])}
+            else:
+                public_network_info = {"external_gateway_info": dict(
+                    network_id=self.topology_public_network_id)}
             routers_client.update_router(router['id'], **public_network_info)
         self.topology_routers[router_name] = router
         self.addCleanup(test_utils.call_and_ignore_notfound_exc,
-                        self.routers_client.delete_router, router['id'])
+                        routers_client.delete_router, router['id'])
         return router
 
     def update_topology_router(
@@ -118,7 +123,7 @@ class ApplianceManager(manager.NetworkScenarioTest):
         if not routers_client:
             routers_client = self.routers_client
         result = routers_client.update_router(router_id,
-                 **update_kwargs)
+                                              **update_kwargs)
         return result
 
     def delete_topology_router(
@@ -157,7 +162,7 @@ class ApplianceManager(manager.NetworkScenarioTest):
         if not networks_client:
             networks_client = self.networks_client
         result = networks_client.update_network(network_id,
-                 **update_kwargs)
+                                                **update_kwargs)
         return result
 
     def delete_topology_network(
@@ -270,8 +275,8 @@ class ApplianceManager(manager.NetworkScenarioTest):
 
     def update_topology_security_group(self, sg_id, client=None,
                                        **updated_kwargs):
-        sg = self.security_groups_client.update_security_group(sg_id,
-             **updated_kwargs)
+        sg = self.security_groups_client.\
+            update_security_group(sg_id, **updated_kwargs)
         return sg
 
     def delete_topology_security_group(self, sg_id, client=None):
@@ -332,12 +337,6 @@ class ApplianceManager(manager.NetworkScenarioTest):
                         client.delete_floatingip,
                         floating_ip['id'])
         return floating_ip
-
-    def delete_floatingip(self, floating_ip, client=None):
-        """Delete floating IP associated to a resource/port on Neutron"""
-        if not client:
-            client = self.os_admin.floating_ips_client
-        client.delete_floatingip(floating_ip['id'])
 
     def create_topology_instance(
             self, server_name, networks, security_groups=None,
@@ -403,11 +402,6 @@ class ApplianceManager(manager.NetworkScenarioTest):
         self.topology_servers[server_name] = server
         return server
 
-    def delete_topology_instance(self, server, servers_client=None):
-        if not servers_client:
-            servers_client = self.os_admin.servers_client
-        servers_client.delete_server(server['id'])
-
     def _list_ports(self, *args, **kwargs):
         """List ports using admin creds """
         ports_list = self.os_admin.ports_client.list_ports(
@@ -462,11 +456,3 @@ class ApplianceManager(manager.NetworkScenarioTest):
             user_id = self.security_groups_client.user_id
             tenant_id = self.security_groups_client.tenant_id
         return user_id, tenant_id
-
-    def create_topology_port(self, network,
-        ports_client=None, **args):
-        if not ports_client:
-            ports_client = self.ports_client
-        port = ports_client.create_port(network_id=network['id'], **args)
-        self.addCleanup(ports_client.delete_port, port['port']['id'])
-        return port
