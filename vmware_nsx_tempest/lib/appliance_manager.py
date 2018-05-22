@@ -105,7 +105,7 @@ class ApplianceManager(manager.NetworkScenarioTest):
         router = routers_client.create_router(
             name=name, admin_state_up=True, tenant_id=tenant_id)['router']
         if set_gateway is not False:
-            if kwargs["enable_snat"] is not None:
+            if kwargs.get("enable_snat"):
                 public_network_info = {"external_gateway_info": dict(
                     network_id=self.topology_public_network_id,
                     enable_snat=kwargs["enable_snat"])}
