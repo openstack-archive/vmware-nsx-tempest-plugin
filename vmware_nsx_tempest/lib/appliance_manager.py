@@ -402,6 +402,14 @@ class ApplianceManager(manager.NetworkScenarioTest):
         self.topology_servers[server_name] = server
         return server
 
+    def create_topology_port(self, network,
+        ports_client=None, **args):
+        if not ports_client:
+            ports_client = self.ports_client
+        port = ports_client.create_port(network_id=network['id'], **args)
+        self.addCleanup(ports_client.delete_port, port['port']['id'])
+        return port
+
     def _list_ports(self, *args, **kwargs):
         """List ports using admin creds """
         ports_list = self.os_admin.ports_client.list_ports(
