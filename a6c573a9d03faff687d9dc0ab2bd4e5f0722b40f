@@ -1,0 +1,9 @@
+Code-Review+2: Deepika Khairnar <dkhairnar@vmware.com>
+Code-Review+2: Adit Sarfaty <asarfaty@vmware.com>
+Workflow+1: Devang Doshi <ddoshi@vmware.com>
+Verified+2: Zuul
+Submitted-by: Zuul
+Submitted-at: Thu, 24 May 2018 03:21:18 +0000
+Reviewed-on: https://review.openstack.org/567812
+Project: openstack/vmware-nsx-tempest-plugin
+Branch: refs/heads/master
