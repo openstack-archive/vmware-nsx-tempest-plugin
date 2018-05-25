@@ -17,6 +17,7 @@ import collections
 import netaddr
 from oslo_log import log as logging
 from oslo_utils import netutils
+import re
 
 from tempest import config
 from tempest.lib.common.utils import data_utils
@@ -105,7 +106,7 @@ class ApplianceManager(manager.NetworkScenarioTest):
         router = routers_client.create_router(
             name=name, admin_state_up=True, tenant_id=tenant_id)['router']
         if set_gateway is not False:
-            if kwargs.get("enable_snat"):
+            if kwargs.get("enable_snat") is not None:
                 public_network_info = {"external_gateway_info": dict(
                     network_id=self.topology_public_network_id,
                     enable_snat=kwargs["enable_snat"])}
@@ -114,9 +115,37 @@ class ApplianceManager(manager.NetworkScenarioTest):
                     network_id=self.topology_public_network_id)}
             routers_client.update_router(router['id'], **public_network_info)
         self.topology_routers[router_name] = router
-        self.addCleanup(test_utils.call_and_ignore_notfound_exc,
-                        routers_client.delete_router, router['id'])
+        if CONF.nsxv3.ens:
+            pass
+        else:
+            self.addCleanup(test_utils.call_and_ignore_notfound_exc,
+                            routers_client.delete_router, router['id'])
         return router
+
+    def get_server_nics(self, ssh_client):
+        reg = re.compile(r'(?P<num>\d+): (?P<nic_name>\w+)[@]?.*:')
+        ipatxt = ssh_client.exec_command("ip address")
+        return reg.findall(ipatxt)
+
+    def create_instance_interface(self, server):
+        old_floating_ip, server = self.floating_ip_tuple
+        ip_address = old_floating_ip['floating_ip_address']
+        private_key = self._get_server_key(server)
+        ssh_client = self.get_remote_client(
+            ip_address, private_key=private_key, server=server)
+        self.get_server_nics(ssh_client)
+        # get a port from a list of one item
+        port_list = self.os_admin.ports_client.list_ports(
+            device_id=server['id'])['ports']
+        self.assertEqual(1, len(port_list))
+        interface = self.interface_client.create_interface(
+            server_id=server['id'],
+            net_id=self.new_net['id'])['interfaceAttachment']
+        self.addCleanup(self.ports_client.wait_for_resource_deletion,
+                        interface['port_id'])
+        self.addCleanup(test_utils.call_and_ignore_notfound_exc,
+                        self.interface_client.delete_interface,
+                        server['id'], interface['port_id'])
 
     def update_topology_router(
             self, router_id, routers_client=None, **update_kwargs):
@@ -143,10 +172,10 @@ class ApplianceManager(manager.NetworkScenarioTest):
         name = data_utils.rand_name(network_name_)
         # Neutron disables port security by default so we have to check the
         # config before trying to create the network with port_security_enabled
-        if CONF.network_feature_enabled.port_security:
-            port_security_enabled = True
-        else:
+        if CONF.network_feature_enabled.port_security and CONF.nsxv3.ens:
             port_security_enabled = False
+        else:
+            port_security_enabled = True
         result = networks_client.create_network(
             name=name, tenant_id=tenant_id,
             port_security_enabled=port_security_enabled, **kwargs)

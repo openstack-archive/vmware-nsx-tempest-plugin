@@ -13,6 +13,7 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
+import os
 import shlex
 import subprocess
 import tempfile
@@ -22,6 +23,7 @@ import urllib3
 from oslo_log import log as logging
 
 from tempest.common.utils.linux import remote_client
+from tempest.common import waiters
 from tempest import config
 from tempest import exceptions
 from tempest.lib.common.utils import test_utils
@@ -44,6 +46,15 @@ class TrafficManager(appliance_manager.ApplianceManager):
         for remote_ip in address_list:
             self.check_remote_connectivity(ssh_source, remote_ip,
                                            should_succeed=should_connect)
+
+    def wait_server_status(self, client, server_id, state='ACTIVE'):
+        if client is None:
+            servers_client = self.servers_client
+        else:
+            servers_client = client
+        waiters.wait_for_server_status(servers_client, server_id,
+                                       state)
+        time.sleep(60)
 
     def check_network_internal_connectivity(
             self, network, floating_ip, server, should_connect=True):
@@ -101,7 +112,7 @@ class TrafficManager(appliance_manager.ApplianceManager):
             username = CONF.validation.image_ssh_user
         # Set this with 'keypair' or others to log in with keypair or
         # username/password.
-        if use_password:
+        if CONF.nsxv3.ens or use_password:
             password = CONF.validation.image_ssh_password
             private_key = None
         else:
@@ -134,6 +145,10 @@ class TrafficManager(appliance_manager.ApplianceManager):
         if not floating_ip:
             LOG.error("Without floating ip, failed to verify SSH connectivity")
             raise
+        if CONF.nsxv3.ens or use_password:
+            private_key = None
+        else:
+            private_key = private_key
         ssh_client = self._get_remote_client(
             ip_address=floating_ip, username=self.ssh_user,
             private_key=private_key, use_password=use_password)
@@ -170,13 +185,24 @@ class TrafficManager(appliance_manager.ApplianceManager):
         except Exception:
             return None
 
+    def query_ens(self, web_ip):
+        wget = "curl http://{0}/".format(web_ip)
+        resp = os.popen(wget).read().rstrip()
+        if "vm" in resp:
+            self.count_response(resp)
+        return self.http_cnt
+
     def do_http_request(self, vip, start_path='', send_counts=None):
         # http_cnt stores no of requests made for each members
         self.http_cnt = {}
-        for x in range(send_counts):
-            resp = self.query_webserver(vip)
+        if not CONF.nsxv3.ens:
+            for x in range(send_counts):
+                resp = self.query_webserver(vip)
+                self.count_response(resp)
+        else:
+            for x in range(send_counts):
+                self.http_cnt = self.query_ens(vip)
         # count_response counts the no of requests made for each members
-            self.count_response(resp)
         return self.http_cnt
 
     def start_web_server(self, protocol_port, server, server_name=None):
