@@ -125,7 +125,8 @@ class LBaasRoundRobinBaseTest(feature_manager.FeatureManager):
     @decorators.idempotent_id('c5ac853b-6867-4b7a-8704-3844b11b1a34')
     def test_lbaas_http_traffic_roundrobin_with_ping_health_type(self):
         self.deploy_lbaas_topology()
-        self.start_web_servers(constants.HTTP_PORT)
+        if not CONF.nsxv3.ens:
+            self.start_web_servers(constants.HTTP_PORT)
         self.create_project_lbaas(protocol_type="HTTP", protocol_port="80",
                                   lb_algorithm="ROUND_ROBIN", hm_type='PING')
         self.check_project_lbaas()
@@ -134,7 +135,8 @@ class LBaasRoundRobinBaseTest(feature_manager.FeatureManager):
     @decorators.idempotent_id('87b709bf-127f-4161-b43f-3915c216c44b')
     def test_lbaas_http_traffic_roundrobin_with_http_health_type(self):
         self.deploy_lbaas_topology()
-        self.start_web_servers(constants.HTTP_PORT)
+        if not CONF.nsxv3.ens:
+            self.start_web_servers(constants.HTTP_PORT)
         self.create_project_lbaas(protocol_type="HTTP", protocol_port="80",
                                   lb_algorithm="ROUND_ROBIN", hm_type='HTTP')
         self.check_lbaas_project_weight_values(constants.NO_OF_VMS_2)
@@ -143,7 +145,8 @@ class LBaasRoundRobinBaseTest(feature_manager.FeatureManager):
     @decorators.idempotent_id('60e9facf-b8d6-48a9-b0d2-942e5bb38f38')
     def test_lbaas_http_leastconnections_with_ping_health_type(self):
         self.deploy_lbaas_topology()
-        self.start_web_servers(constants.HTTP_PORT)
+        if not CONF.nsxv3.ens:
+            self.start_web_servers(constants.HTTP_PORT)
         self.create_project_lbaas(protocol_type="HTTP", protocol_port="80",
                                   lb_algorithm="LEAST_CONNECTIONS",
                                   hm_type='PING')
@@ -153,7 +156,8 @@ class LBaasRoundRobinBaseTest(feature_manager.FeatureManager):
     @decorators.idempotent_id('3041a103-e03d-4660-b411-2f9d5987dba8')
     def test_lbaas_http_leastconnections_with_http_health_type(self):
         self.deploy_lbaas_topology()
-        self.start_web_servers(constants.HTTP_PORT)
+        if not CONF.nsxv3.ens:
+            self.start_web_servers(constants.HTTP_PORT)
         self.create_project_lbaas(protocol_type="HTTP", protocol_port="80",
                                   lb_algorithm="LEAST_CONNECTIONS",
                                   hm_type='HTTP')
@@ -163,7 +167,8 @@ class LBaasRoundRobinBaseTest(feature_manager.FeatureManager):
     @decorators.idempotent_id('73190a30-3879-4828-a198-4d3fff4cea3a')
     def test_lbaas_http_leastconnection_with_weighted_value(self):
         self.deploy_lbaas_topology()
-        self.start_web_servers(constants.HTTP_PORT)
+        if not CONF.nsxv3.ens:
+            self.start_web_servers(constants.HTTP_PORT)
         self.create_project_lbaas(protocol_type="HTTP", protocol_port="80",
                                   lb_algorithm="LEAST_CONNECTIONS",
                                   hm_type='HTTP', weight=1)
@@ -173,7 +178,8 @@ class LBaasRoundRobinBaseTest(feature_manager.FeatureManager):
     @decorators.idempotent_id('a18347f8-9de0-49b0-8935-5fd26c135afb')
     def test_lbaas_http_leastconnection_updated_weighted_value(self):
         self.deploy_lbaas_topology()
-        self.start_web_servers(constants.HTTP_PORT)
+        if not CONF.nsxv3.ens:
+            self.start_web_servers(constants.HTTP_PORT)
         self.create_project_lbaas(protocol_type="HTTP", protocol_port="80",
                                   lb_algorithm="LEAST_CONNECTIONS",
                                   hm_type='HTTP')
@@ -185,7 +191,8 @@ class LBaasRoundRobinBaseTest(feature_manager.FeatureManager):
     @decorators.idempotent_id('5041a903-e03d-4660-e421-2f9d5987dba9')
     def test_lbaas_http_leastconnection_updated_algorithm(self):
         self.deploy_lbaas_topology()
-        self.start_web_servers(constants.HTTP_PORT)
+        if not CONF.nsxv3.ens:
+            self.start_web_servers(constants.HTTP_PORT)
         self.create_project_lbaas(protocol_type="HTTP", protocol_port="80",
                                   lb_algorithm="LEAST_CONNECTIONS",
                                   hm_type='HTTP')
@@ -197,7 +204,8 @@ class LBaasRoundRobinBaseTest(feature_manager.FeatureManager):
     @decorators.idempotent_id('cb9f483b-a7b3-41fc-9a5f-86a8738f853b')
     def test_lbaas_http_roundrobin_with_weighted_value(self):
         self.deploy_lbaas_topology()
-        self.start_web_servers(constants.HTTP_PORT)
+        if not CONF.nsxv3.ens:
+            self.start_web_servers(constants.HTTP_PORT)
         self.create_project_lbaas(protocol_type="HTTP", protocol_port="80",
                                   lb_algorithm="ROUND_ROBIN",
                                   hm_type='HTTP', weight=1)

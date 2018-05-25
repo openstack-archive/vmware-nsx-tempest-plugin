@@ -683,8 +683,9 @@ class ScenarioTest(tempest.test.BaseTestCase):
                 addresses = (server['addresses'][network['name']]
                              if network else [])
             for address in addresses:
-                if (address['version'] == CONF.validation.ip_version_for_ssh
-                        and address['OS-EXT-IPS:type'] == 'fixed'):
+                if address['version'] == \
+                   CONF.validation.ip_version_for_ssh and \
+                   address['OS-EXT-IPS:type'] == 'fixed':
                     return address['addr']
             raise exceptions.ServerUnreachable(server_id=server['id'])
         else:
@@ -713,8 +714,7 @@ class NetworkScenarioTest(ScenarioTest):
 
     def _create_network(self, networks_client=None,
                         tenant_id=None,
-                        namestart='network-smoke-',
-                        port_security_enabled=True):
+                        namestart='network-smoke-'):
         if not networks_client:
             networks_client = self.networks_client
         if not tenant_id:
@@ -724,7 +724,13 @@ class NetworkScenarioTest(ScenarioTest):
         # Neutron disables port security by default so we have to check the
         # config before trying to create the network with port_security_enabled
         if CONF.network_feature_enabled.port_security:
-            network_kwargs['port_security_enabled'] = port_security_enabled
+            if not CONF.nsxv3.ens:
+                port_security_enabled = True
+            else:
+                port_security_enabled = False
+        else:
+            port_security_enabled = False
+        network_kwargs['port_security_enabled'] = port_security_enabled
         result = networks_client.create_network(**network_kwargs)
         network = result['network']
 

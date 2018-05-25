@@ -34,24 +34,30 @@ class TestMDProxy(feature_manager.FeatureManager):
     with nsxv3 backend, test MDProxy with isolated network and so on.
     """
 
-    def setUp(self):
-        super(TestMDProxy, self).setUp()
-        self.nsx = nsxv3_client.NSXV3Client(CONF.nsxv3.nsx_manager,
-                                            CONF.nsxv3.nsx_user,
-                                            CONF.nsxv3.nsx_password)
-
     @classmethod
     def skip_checks(cls):
-        """Class level skip checks.
-
-        Class level check. Skip all the MDproxy tests, if native_dhcp_metadata
-        is not True under nsxv3 section of the config
-        """
         super(TestMDProxy, cls).skip_checks()
         if not CONF.nsxv3.native_dhcp_metadata:
             msg = " native_dhcp_metadata is not enabled under nsxv3 config" \
                   ", skipping all the MDProxy tests!!!"
             raise cls.skipException(msg)
+
+    @classmethod
+    def setup_credentials(cls):
+        cls.set_network_resources()
+        cls.admin_mgr = cls.get_client_manager('admin')
+        super(TestMDProxy, cls).setup_credentials()
+
+    @classmethod
+    def setup_clients(cls):
+        """
+        Create various client connections. Such as NSX.
+        """
+        super(TestMDProxy, cls).setup_clients()
+        cls.nsx = nsxv3_client.NSXV3Client(
+            CONF.nsxv3.nsx_manager,
+            CONF.nsxv3.nsx_user,
+            CONF.nsxv3.nsx_password)
 
     def _verify_md(self, md_url, expected_value="",
                    sub_result=None, ssh_client=None):

@@ -146,16 +146,18 @@ class TestRouterNoNATOps(manager.NetworkScenarioTest):
         return subnet
 
     def _create_server(self, name, network, image_id=None):
+        kwargs = {}
         keypair = self.create_keypair()
         self.keypairs[keypair['name']] = keypair
-        security_groups = [{'name': self.security_group['name']}]
+        if CONF.nsxv3.ens is not True:
+            security_groups = [{'name': self.security_group['name']}]
+            kwargs["security_groups"] = security_groups
         network = {'uuid': network['id']}
         server = self.create_server(name=name, networks=[network],
                                     key_name=keypair['name'],
                                     config_drive=self.config_drive,
-                                    security_groups=security_groups,
                                     image_id=image_id,
-                                    wait_until='ACTIVE')
+                                    wait_until='ACTIVE', **kwargs)
         self.servers.append(server)
         return server
 
@@ -290,7 +292,7 @@ class TestRouterNoNATOps(manager.NetworkScenarioTest):
             'network_id': CONF.network.public_network_id,
             'enable_snat': (not snat)}
         self._update_router(self.router['id'], self.cmgr_adm.routers_client,
-            external_gateway_info)
+                            external_gateway_info)
         nsx_router = self.nsx.get_logical_router(
             self.router['name'], self.router['id'])
         self.assertNotEqual(nsx_router, None)
@@ -333,7 +335,7 @@ class TestRouterNoNATOps(manager.NetworkScenarioTest):
             'network_id': CONF.network.public_network_id,
             'enable_snat': (not snat)}
         self._update_router(self.router['id'], self.cmgr_adm.routers_client,
-            external_gateway_info)
+                            external_gateway_info)
         floating_ip = self.create_floating_ip(self.server)
         self.floating_ip_tuple = Floating_IP_tuple(floating_ip, self.server)
         nsx_router = self.nsx.get_logical_router(
@@ -381,6 +383,6 @@ class TestRouterNoNATOps(manager.NetworkScenarioTest):
         self.network = self._create_network()
         self.subnet = self._create_subnet(self.network)
         self.assertRaises(exceptions.Forbidden, self._create_router,
-            router_name=data_utils.rand_name('router-smoke'),
-            external_network_id=CONF.network.public_network_id,
-            enable_snat=False)
+                          router_name=data_utils.rand_name('router-smoke'),
+                          external_network_id=CONF.network.public_network_id,
+                          enable_snat=False)

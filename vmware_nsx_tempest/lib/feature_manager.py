@@ -401,20 +401,28 @@ class FeatureManager(traffic_manager.IperfManager,
         time.sleep(constants.SLEEP_BETWEEN_VIRTUAL_SEREVRS_OPEARTIONS)
         self.do_http_request(vip=vip, send_counts=self.poke_counters)
         # ROUND_ROUBIN, so equal counts
-        no_of_vms = len(self.http_cnt)
-        if no_of_vms:
-            if (self.http_cnt['server_lbaas_0'] <
-                    (self.poke_counters / no_of_vms)):
-                self.assertGreater(self.http_cnt['server_lbaas_1'],
-                                   self.poke_counters / no_of_vms)
-            elif (self.http_cnt['server_lbaas_0'] >
-                  (self.poke_counters / no_of_vms)):
-                self.assertLess(self.http_cnt['server_lbaas_1'],
-                                self.poke_counters / no_of_vms)
-            else:
-                self.assertEqual(self.http_cnt['server_lbaas_1'],
-                                 self.poke_counters / no_of_vms,
+        if CONF.nsxv3.ens:
+            vms = len(self.topology_servers.keys())
+            if vms:
+                self.assertEqual(self.http_cnt["Welcome vm"] / 2, 3 * vms,
                                  "LB fails with weighted values")
+            else:
+                pass
+        else:
+            no_of_vms = len(self.http_cnt)
+            if no_of_vms:
+                if (self.http_cnt['server_lbaas_0'] <
+                        (self.poke_counters / no_of_vms)):
+                    self.assertGreater(self.http_cnt['server_lbaas_1'],
+                                       self.poke_counters / no_of_vms)
+                elif (self.http_cnt['server_lbaas_0'] >
+                      (self.poke_counters / no_of_vms)):
+                    self.assertLess(self.http_cnt['server_lbaas_1'],
+                                    self.poke_counters / no_of_vms)
+                else:
+                    self.assertEqual(self.http_cnt['server_lbaas_1'],
+                                     self.poke_counters / no_of_vms,
+                                     "LB fails with weighted values")
 
     def check_project_lbaas(self, count=2):
         i = 0
@@ -423,13 +431,19 @@ class FeatureManager(traffic_manager.IperfManager,
         self.do_http_request(vip=vip, send_counts=self.poke_counters)
         # ROUND_ROUBIN, so equal counts
         no_of_vms = len(self.http_cnt)
-        for server_name in self.topology_servers.keys():
-            if i < count:
-                i += 1
-                self.assertEqual(self.poke_counters / no_of_vms,
-                                 self.http_cnt[server_name])
-            else:
-                break
+        if CONF.nsxv3.ens:
+            vms = len(self.topology_servers.keys())
+            if self.http_cnt["Welcome vm"] == self.poke_counters:
+                self.assertEqual(self.http_cnt["Welcome vm"] / vms,
+                                 3 * vms)
+        else:
+            for server_name in self.topology_servers.keys():
+                if i < count:
+                    i += 1
+                    self.assertEqual(self.poke_counters / no_of_vms,
+                                     self.http_cnt[server_name])
+                else:
+                    break
 
     def count_response(self, response):
         if response in self.http_cnt:
@@ -501,9 +515,10 @@ class FeatureManager(traffic_manager.IperfManager,
                 count += 1
             else:
                 break
-        self.ports_client.update_port(
-            self.loadbalancer['vip_port_id'],
-            security_groups=[self.sg['id']])
+        if not CONF.nsxv3.ens:
+            self.ports_client.update_port(
+                self.loadbalancer['vip_port_id'],
+                security_groups=[self.sg['id']])
         # create lbaas public interface
         vip_fip = \
             self.create_floatingip(self.loadbalancer,

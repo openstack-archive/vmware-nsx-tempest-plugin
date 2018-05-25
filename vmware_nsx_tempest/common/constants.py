@@ -65,7 +65,7 @@ TIME = {"SEC": {"SIXTY": 60}}
 
 VLAN_TYPE = 'vlan'
 VXLAN_TYPE = 'geneve'
-VLAN = 2099
+VLAN = 4050
 
 NO_OF_VMS_2 = 2
 NO_OF_VMS_4 = 4
@@ -77,7 +77,7 @@ REJECT = "REJECT"
 
 # ZONE Designate
 ZONE_WAIT_TIME = 120
-#VPN
+# VPN
 PEER_ID = "172.24.4.12"
 PFS = "group14"
 ENCRYPTION_ALGO = "aes-128"
