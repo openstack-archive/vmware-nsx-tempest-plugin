@@ -14,6 +14,7 @@
 #    under the License.
 
 import collections
+import time
 
 from oslo_log import log as logging
 
@@ -23,6 +24,7 @@ from tempest.lib.common.utils import test_utils
 from tempest.lib import decorators
 from tempest import test
 
+from vmware_nsx_tempest.common import constants
 from vmware_nsx_tempest.services import nsxv3_client
 from vmware_nsx_tempest.tests.scenario import manager
 
@@ -270,6 +272,7 @@ class TestProviderSecurityGroup(manager.NetworkScenarioTest):
         sg_id = sg.get('id')
         self.create_security_group_rule(sg_id, cmgr=self.cmgr_adm,
                                         protocol='icmp')
+        time.sleep(constants.NSX_BACKEND_TIME_INTERVAL)
         p_client = self.ports_client
         kwargs = {"provider_security_groups": ["%s" % sg_id]}
         port_id_psg = self.get_port_id(network_topo['network']['id'],
@@ -279,7 +282,9 @@ class TestProviderSecurityGroup(manager.NetworkScenarioTest):
                                            network_topo['subnet']['id'],
                                            servers['server_default'])
         p_client.update_port(port_id_psg, **kwargs)
+        time.sleep(constants.NSX_BACKEND_TIME_INTERVAL)
         p_client.update_port(port_id_default, **kwargs)
+        time.sleep(constants.NSX_BACKEND_TIME_INTERVAL)
         self._check_server_connectivity(public_ip_address_default_vm,
                                         private_ip_address_psg_vm,
                                         private_key_default_vm,
@@ -313,6 +318,7 @@ class TestProviderSecurityGroup(manager.NetworkScenarioTest):
                                         private_key_default_vm)
         self.create_security_group_rule(sg_id, cmgr=self.cmgr_adm,
                                         protocol='icmp')
+        time.sleep(constants.NSX_BACKEND_TIME_INTERVAL)
         self._check_server_connectivity(ip_address_default_vm,
                                         private_ip_address_psg_vm,
                                         private_key_default_vm,
@@ -338,6 +344,7 @@ class TestProviderSecurityGroup(manager.NetworkScenarioTest):
                                         private_key_default_vm)
         self.create_security_group_rule(sg_id, cmgr=self.cmgr_adm,
                                         protocol='icmp')
+        time.sleep(constants.NSX_BACKEND_TIME_INTERVAL)
         self._check_server_connectivity(ip_address_default_vm,
                                         private_ip_address_psg_vm,
                                         private_key_default_vm,
@@ -346,6 +353,7 @@ class TestProviderSecurityGroup(manager.NetworkScenarioTest):
         port_id = self.get_port_id(network['id'],
                                    network_topo['subnet']['id'], server_psg)
         self.cmgr_adm.ports_client.update_port(port_id, **kwargs)
+        time.sleep(constants.NSX_BACKEND_TIME_INTERVAL)
         self._check_server_connectivity(ip_address_default_vm,
                                         private_ip_address_psg_vm,
                                         private_key_default_vm)
@@ -393,6 +401,7 @@ class TestProviderSecurityGroup(manager.NetworkScenarioTest):
                                         private_key_default_vm_1)
         self.create_security_group_rule(sg_id, cmgr=self.cmgr_adm,
                                         protocol='icmp')
+        time.sleep(constants.NSX_BACKEND_TIME_INTERVAL)
         self._check_server_connectivity(ip_address_default_vm_1,
                                         private_ip_address_psg_vm_1,
                                         private_key_default_vm_1,
