@@ -580,11 +580,23 @@ class NSXV3Client(object):
         Get self signed openstack client certificate
         """
         cert_response = self.get_nsx_certificate()
+        i_err = "No certificates in the backend"
+        k_err ="Argument does not exist in the certificate"
+        #check for empty certificates
+        try:
+            cert_response['results'][0]
+        except IndexError, i_err:
+            LOG.error(i_err)
+        #check if openstack certificate is enabled
         for cert in cert_response['results']:
-            if (cert["_create_user"] == "admin" and cert[
-                "resource_type"] == "certificate_self_signed" and cert[
-                "display_name"] != "NSX MP Client Certificate for Key "
-                                   "Manager"):
+            try:
+                cert['used_by'][0]['service_types']
+                cert["_create_user"]
+            except KeyError, k_err:
+                LOG.error(k_err)
+            if (cert['used_by'][0]['service_types'][0] == 'Client Authentication'
+                and cert["_create_user"] == "admin" and 
+                "'com.vmware.nsx.openstack'" in cert['used_by'][0]['node_id']):
                 LOG.info('Client certificate created')
                 return cert
         LOG.error("Client Certificate not created")
