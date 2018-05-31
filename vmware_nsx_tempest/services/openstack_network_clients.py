@@ -470,3 +470,8 @@ class ZonesV2Client(designate_base.DnsClientBase):
 
     def list_zones(self):
         return self._list_request(self.resource_base_path)
+
+    def list_recordset_zone(self, zone_id):
+        request = self.resource_base_path + '/' + zone_id + '/recordsets'
+        resp, body = self._list_request(request)
+        return resp, body

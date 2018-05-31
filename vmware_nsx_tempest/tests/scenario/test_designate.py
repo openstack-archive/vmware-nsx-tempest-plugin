@@ -71,7 +71,7 @@ class TestZonesV2Ops(feature_manager.FeatureManager):
         return zone
 
     def create_zone_topology(self, zone_name):
-        networks_client = self.os_admin.networks_client
+        networks_client = self.cmgr_adm.networks_client
         network_designate = self.create_topology_network(
             "network_designate", networks_client=networks_client,
             dns_domain=zone_name)
@@ -201,8 +201,9 @@ class TestZonesScenario(TestZonesV2Ops):
         fip = dns_vm['floating_ips'][0]['floating_ip_address']
         self.verify_recordset(recordset, 3)
         self.verify_recordset_floatingip(recordset, fip)
-        self.delete_floatingip(dns_vm['floating_ips'][0])
-        self.delete_topology_instance(dns_vm)
+        fip_id = dns_vm['floating_ips'][0]['id']
+        self.os_admin.floating_ips_client.delete_floatingip(fip_id)
+        self.os_admin.servers_client.delete_server(dns_vm['id'])
         LOG.info('Show recordset of the zone')
         recordset = self.list_record_set_zone(zone['id'])
         self.verify_recordset(recordset, 2)
