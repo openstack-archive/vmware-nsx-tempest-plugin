@@ -335,12 +335,11 @@ class ScenarioTest(tempest.test.BaseTestCase):
         @param private_key the SSH private key to use
         @return a RemoteClient object
         """
-
         if username is None:
             username = CONF.validation.image_ssh_user
         # Set this with 'keypair' or others to log in with keypair or
         # username/password.
-        if CONF.validation.auth_method == 'keypair':
+        if CONF.validation.auth_method == 'keypair' and CONF.nsxv3.ens == False:
             password = None
             if private_key is None:
                 private_key = self.keypair['private_key']
@@ -1226,8 +1225,7 @@ class NetworkScenarioTest(ScenarioTest):
         else:
             network = self._create_network(
                 networks_client=networks_client,
-                tenant_id=tenant_id,
-                port_security_enabled=port_security_enabled)
+                tenant_id=tenant_id)
             router = self._get_router(client=routers_client,
                                       tenant_id=tenant_id)
             subnet_kwargs = dict(network=network,
