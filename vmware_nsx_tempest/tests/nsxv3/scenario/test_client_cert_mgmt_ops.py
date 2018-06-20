@@ -35,8 +35,8 @@ LOG = logging.getLogger(__name__)
 
 class TestCertificateMgmt(manager.NetworkScenarioTest):
 
-    error_msg = ["Principal \'admin\'",
-                 "attempts to delete or modify an object it doesn't own"]
+    error_msg = ["Principal \'admin\' with role \'[enterprise_admin]\'",
+                 "attempts to delete or modify an object"]
 
     @classmethod
     def skip_checks(cls):
