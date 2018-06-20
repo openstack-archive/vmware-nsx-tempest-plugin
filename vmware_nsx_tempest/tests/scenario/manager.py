@@ -335,12 +335,12 @@ class ScenarioTest(tempest.test.BaseTestCase):
         @param private_key the SSH private key to use
         @return a RemoteClient object
         """
-
         if username is None:
             username = CONF.validation.image_ssh_user
         # Set this with 'keypair' or others to log in with keypair or
         # username/password.
-        if CONF.validation.auth_method == 'keypair':
+        if CONF.validation.auth_method == 'keypair' and \
+           CONF.nsxv3.ens is False:
             password = None
             if private_key is None:
                 private_key = self.keypair['private_key']
@@ -822,8 +822,8 @@ class NetworkScenarioTest(ScenarioTest):
         port_map = [(p["id"], fxip["ip_address"])
                     for p in ports
                     for fxip in p["fixed_ips"]
-                    if netutils.is_valid_ipv4(fxip["ip_address"])
-                    and p['status'] in p_status]
+                    if netutils.is_valid_ipv4(fxip["ip_address"]) and
+                    p['status'] in p_status]
         inactive = [p for p in ports if p['status'] != 'ACTIVE']
         if inactive:
             LOG.warning("Instance has ports that are not ACTIVE: %s", inactive)
@@ -1226,8 +1226,7 @@ class NetworkScenarioTest(ScenarioTest):
         else:
             network = self._create_network(
                 networks_client=networks_client,
-                tenant_id=tenant_id,
-                port_security_enabled=port_security_enabled)
+                tenant_id=tenant_id)
             router = self._get_router(client=routers_client,
                                       tenant_id=tenant_id)
             subnet_kwargs = dict(network=network,
