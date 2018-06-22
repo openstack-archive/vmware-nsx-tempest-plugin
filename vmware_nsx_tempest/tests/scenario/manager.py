@@ -1200,7 +1200,7 @@ class NetworkScenarioTest(ScenarioTest):
     def create_networks(self, networks_client=None,
                         routers_client=None, subnets_client=None,
                         tenant_id=None, dns_nameservers=None,
-                        port_security_enabled=True):
+                        ):
         """Create a network with a subnet connected to a router.
 
         The baremetal driver is a special case since all nodes are
@@ -1226,8 +1226,7 @@ class NetworkScenarioTest(ScenarioTest):
         else:
             network = self._create_network(
                 networks_client=networks_client,
-                tenant_id=tenant_id,
-                port_security_enabled=port_security_enabled)
+                tenant_id=tenant_id)
             router = self._get_router(client=routers_client,
                                       tenant_id=tenant_id)
             subnet_kwargs = dict(network=network,
