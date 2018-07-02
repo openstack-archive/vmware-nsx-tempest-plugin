@@ -569,7 +569,7 @@ class NSXV3Client(object):
         """
         body = {}
         endpoint = "/administration/audit-logs?page_size=100"
-        body['log_age_limit'] = 1
+        body['log_age_limit'] = 100
         body['log_filter'] = pattern
         body['log_filter_type'] = "TEXT"
         response = self.post(endpoint, body)
