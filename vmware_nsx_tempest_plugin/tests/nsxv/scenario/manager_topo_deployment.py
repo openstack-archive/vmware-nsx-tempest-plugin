@@ -17,6 +17,7 @@ import collections
 import os
 import re
 import shlex
+import six
 import subprocess
 import time
 import traceback
@@ -263,7 +264,7 @@ class TopoDeployScenarioManager(manager.NetworkScenarioTest):
         flavor = flavor or CONF.compute.flavor_ref
         servers_client = servers_client or self.servers_client
         create_kwargs = create_kwargs or {}
-        if type(tenant_id) in (str, unicode):  # noqa
+        if type(tenant_id) in (str, six.text_type):  # noqa
             if servers_client.tenant_id != tenant_id:
                 create_kwargs['tenant_id'] = tenant_id
 
@@ -465,7 +466,7 @@ class TopoDeployScenarioManager(manager.NetworkScenarioTest):
         PING_INSESSION = 'ping-progress-in-session'
         PING_DONE = 'ping-progress-completed'
         PING_TIMEOUT = 'ping-progress-timeout'
-        if msg and type(msg) in (str, unicode):  # noqa
+        if msg and type(msg) in (str, six.text_type):  # noqa
             xmsg = ("waitfor_host_connected ip=%(ip)s! %(msg)s" %
                     {'ip': host_ip, 'msg': msg})
             LOG.debug(xmsg)
@@ -678,7 +679,7 @@ def check_hosts_connectivity(host, dest_list, ignore_helper=None,
     for dest in dest_list:
         # caller can say to ignore dest ipaddr
         if ('helper' in dest and
-                type(ignore_helper) in (str, unicode) and  # noqa
+                type(ignore_helper) in (str, six.text_type) and  # noqa
                 re.search(ignore_helper, dest['helper'], re.I)):  # noqa
             dest['reachable'] = None
             continue
