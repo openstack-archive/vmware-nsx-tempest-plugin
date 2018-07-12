@@ -12,6 +12,7 @@
 #    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 #    License for the specific language governing permissions and limitations
 #    under the License.
+
 from oslo_log import log
 
 from tempest import config
@@ -475,3 +476,17 @@ class ZonesV2Client(designate_base.DnsClientBase):
         request = self.resource_base_path + '/' + zone_id + '/recordsets'
         resp, body = self._list_request(request)
         return resp, body
+
+
+class DesignatePtrClient(designate_base.DnsClientBase):
+    """
+    Request resources via API for Designate PTR RecordSet Client
+        PTR recordset show request
+    """
+    path = "reverse/floatingips/"
+
+    def show_ptr_record(self, ptr_id):
+        """
+        Show FloatingIP PTR record
+        """
+        return self._show_request(self.path, ptr_id)
