@@ -193,6 +193,40 @@ class ApplianceManager(manager.NetworkScenarioTest):
         self.topology_networks[network_name] = network
         return network
 
+    def create_provider_network(self, net_type,
+                                zone_name,
+                                admin_state_up=True,
+                                tz_id=None,
+                                vlan_id_unique=None):
+        networks_client = self.cmgr_adm.networks_client
+        if net_type == constants.VXLAN_TYPE:
+            name = "provider_network_vxlan"
+            body = {"provider:physical_network": tz_id,
+                    "provider:network_type": net_type,
+                    "admin_state_up": admin_state_up,
+                    "dns_domain": zone_name}
+        elif net_type == constants.VLAN_TYPE:
+            name = "provider_network_vlan"
+            if vlan_id_unique is not None:
+                vlan_id_no = vlan_id_unique
+            else:
+                vlan_id_no = constants.VLAN
+            if tz_id is None:
+                body = {"provider:segmentation_id": vlan_id_no,
+                        "provider:network_type": net_type,
+                        "admin_state_up": admin_state_up,
+                        "dns_domain": zone_name}
+            else:
+                body = {"provider:segmentation_id": vlan_id_no,
+                        "provider:network_type": net_type,
+                        "provider:physical_network": tz_id,
+                        "admin_state_up": admin_state_up,
+                        "dns_domain": zone_name}
+        network = self.create_topology_network(name,
+                                               networks_client=networks_client,
+                                               **body)
+        return network
+
     def update_topology_network(
             self, network_id, networks_client=None, **update_kwargs):
         if not networks_client:

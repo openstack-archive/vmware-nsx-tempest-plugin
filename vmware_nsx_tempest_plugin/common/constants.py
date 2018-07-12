@@ -79,6 +79,8 @@ REJECT = "REJECT"
 AUDIT_WAIT_TIME = 300
 # ZONE Designate
 ZONE_WAIT_TIME = 120
+REGION_NAME = "RegionOne"
+ZONE_NAME = 'tempest-dns-network.com.'
 # VPN
 PEER_ID = "172.24.4.12"
 PFS = "group14"
