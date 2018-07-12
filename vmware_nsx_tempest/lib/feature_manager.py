@@ -845,3 +845,10 @@ class FeatureManager(traffic_manager.IperfManager,
         """
         body = self.zones_v2_client.list_recordset_zone(uuid)
         return body
+
+    def list_ptr_recordset(self, name):
+        """list recordsets of a zone.
+        :param uuid: The unique identifier of the zone.
+        """
+        body = self.zones_v2_client.list_ptr_recordset(name)
+        return body

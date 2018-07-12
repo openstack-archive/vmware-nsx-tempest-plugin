@@ -89,12 +89,12 @@ class NSXClient(object):
             pass
         return None
 
-    def get_audit_log_info(self, obj_id):
+    def get_audit_log_info(self, user_id, obj_id):
         """
         Retrieve audit log information for openstack user
         """
         if self.backend == "nsxv3":
-            output = self.nsx.get_audit_log(obj_id)
+            output = self.nsx.get_audit_log(user_id, obj_id)
             return output
         else:
             pass

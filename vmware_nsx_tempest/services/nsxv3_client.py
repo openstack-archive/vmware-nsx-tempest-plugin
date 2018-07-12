@@ -559,7 +559,7 @@ class NSXV3Client(object):
         response = self.get(endpoint)
         return response.json()
 
-    def get_audit_log(self, pattern):
+    def get_audit_log(self, user_id, pattern):
         """
         Obtain audit log from mgmt plane
         log_age_limit include logs not past the age limit in days
@@ -568,8 +568,10 @@ class NSXV3Client(object):
         :return log message relevant to the object id
         """
         body = {}
-        endpoint = "/administration/audit-logs?page_size=100"
-        body['log_age_limit'] = 100
+        audit_ep = "/administration/audit-logs?"
+        fields = "fields=%s?" % user_id
+        endpoint = audit_ep + fields + "page_size=100"
+        body['log_age_limit'] = 1
         body['log_filter'] = pattern
         body['log_filter_type'] = "TEXT"
         response = self.post(endpoint, body)
