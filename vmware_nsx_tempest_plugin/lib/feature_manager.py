@@ -15,6 +15,8 @@
 
 import time
 
+from designate_tempest_plugin.tests import base
+
 from neutron_lib import constants as nl_constants
 
 from tempest import config
@@ -25,7 +27,6 @@ from tempest.lib import exceptions as lib_exc
 from vmware_nsx_tempest_plugin._i18n import _
 from vmware_nsx_tempest_plugin.common import constants
 from vmware_nsx_tempest_plugin.lib import traffic_manager
-from vmware_nsx_tempest_plugin.services import designate_base
 from vmware_nsx_tempest_plugin.services import fwaas_client as FWAASC
 from vmware_nsx_tempest_plugin.services.lbaas import health_monitors_client
 from vmware_nsx_tempest_plugin.services.lbaas import listeners_client
@@ -45,7 +46,7 @@ RULE_TYPE_DSCP_MARK = "dscp_marking"
 
 # It includes feature related function such CRUD Mdproxy, L2GW or QoS
 class FeatureManager(traffic_manager.IperfManager,
-                     designate_base.DnsClientBase):
+                     base.BaseDnsV2Test):
     @classmethod
     def setup_clients(cls):
         """Create various client connections. Such as NSXv3 and L2 Gateway.
@@ -116,8 +117,12 @@ class FeatureManager(traffic_manager.IperfManager,
             net_client.region,
             net_client.endpoint_type,
             **_params)
+        cls.primary_zones_client = cls.os_primary.zones_client
+        cls.admin_zones_client = cls.os_admin.zones_client
+        cls.admin_recordset_client = cls.os_admin.recordset_client
+        cls.primary_recordset_client = cls.os_primary.recordset_client
         net_client.service = 'dns'
-        cls.zones_v2_client = openstack_network_clients.ZonesV2Client(
+        cls.ptr_client = openstack_network_clients.DesignatePtrClient(
             net_client.auth_provider,
             net_client.service,
             net_client.region,
@@ -929,14 +934,12 @@ class FeatureManager(traffic_manager.IperfManager,
         email_id = 'example@%s' % str(zone_name).rstrip('.')
         return email_id
 
-    def create_zone(self, name=None, email=None, description=None,
-                    wait_until=False):
+    def create_zone(self, user=None, name=None, email=None, description=None,
+                    wait_until=False, tenant_id=None):
         """Create a zone with the specified parameters.
         :param name: The name of the zone.
             Default: Random Value
         :param email: The email for the zone.
-            Default: Random Value
-        :param ttl: The ttl for the zone.
             Default: Random Value
         :param description: A description of the zone.
             Default: Random Value
@@ -945,15 +948,25 @@ class FeatureManager(traffic_manager.IperfManager,
         """
         if name is None:
             name = self.rand_zone_name()
-        zone = {
-            'name': name,
-            'email': email or self.rand_email(name),
-            'description': description or data_utils.rand_name('test-zone'),
-        }
-        _, body = self.zones_v2_client.create_zone(wait_until, **zone)
-        self.addCleanup(test_utils.call_and_ignore_notfound_exc,
-                        self.delete_zone, body['id'])
-        # Create Zone should Return a HTTP 202
+        email = email or self.rand_email(name)
+        description = description or data_utils.rand_name('test-zone')
+        if user is None or user == 'admin':
+            _, body = self.admin_zones_client.create_zone(name=name,
+                email=email,
+                description=description,
+                wait_until=wait_until)
+            self.addCleanup(test_utils.call_and_ignore_notfound_exc,
+                            self.admin_zones_client.delete_zone, body['id'])
+        elif user == 'primary':
+            _, body = self.primary_zones_client.create_zone(name=name,
+                email=email,
+                description=description,
+                wait_until=wait_until)
+            self.addCleanup(test_utils.call_and_ignore_notfound_exc,
+                            self.primary_zones_client.delete_zone, body['id'])
+        LOG.info('Ensure we respond with CREATE+PENDING')
+        self.assertEqual('CREATE', body['action'])
+        self.assertEqual('PENDING', body['status'])
         return body
 
     def delete_zone(self, uuid):
@@ -961,7 +974,7 @@ class FeatureManager(traffic_manager.IperfManager,
         :param uuid: The unique identifier of the zone.
         :return: A tuple with the server response and the response body.
         """
-        _, body = self.zones_v2_client.delete_zone(uuid)
+        _, body = self.admin_zones_client.delete_zone(uuid)
         return body
 
     def show_zone(self, uuid):
@@ -969,38 +982,57 @@ class FeatureManager(traffic_manager.IperfManager,
         :param uuid: Unique identifier of the zone in UUID format.
         :return: Serialized zone as a dictionary.
         """
-        return self.zones_v2_client.show_zone(uuid)
+        return self.admin_zones_client.show_zone(uuid)
 
     def list_zones(self):
         """Gets a list of zones.
         :return: Serialized zones as a list.
         """
-        return self.zones_v2_client.list_zones()
+        return self.admin_zones_client.list_zones()
 
-    def update_zone(self, uuid, email=None, ttl=None,
-                    description=None, wait_until=False):
-        """Update a zone with the specified parameters.
-        :param uuid: The unique identifier of the zone.
-        :param email: The email for the zone.
-            Default: Random Value
-        :param ttl: The ttl for the zone.
-            Default: Random Value
-        :param description: A description of the zone.
-            Default: Random Value
-        :param wait_until: Block until the zone reaches the desiered status
-        :return: A tuple with the server response and the updated zone.
+    def create_recordset(self, zone_id, zone_name, record,
+                        record_type=None, wait_until=False):
+        """Create a recordset for the specified zone.
+        :param zone_uuid: Unique identifier of the zone in UUID format..
+        :param recordset_data: A dictionary that represents the recordset
+                               data.
+        :param params: A Python dict that represents the query paramaters to
+                       include in the request URI.
+        :return: A tuple with the server response and the created zone.
         """
-        zone = {
-            'email': email or self.rand_email(),
-            'ttl': ttl or self.rand_ttl(),
-            'description': description or self.rand_name('test-zone'),
-        }
-        _, body = self.zones_v2_client.update_zone(uuid, wait_until, **zone)
+        if record_type is None:
+            recordset_data = data_utils.rand_recordset_data(
+                record_type='A', zone_name=zone_name)
+        else:
+            recordset_data = {
+                'record_type': record_type,
+                'zone_name': zone_name,
+                'records': record,
+            }
+        LOG.info('Create a Recordset')
+        resp, body = self.admin_recordset_client.create_recordset(
+            zone_id, recordset_data, wait_until)
+        LOG.info('Ensure we respond with PENDING')
+        self.assertEqual('PENDING', body['status'])
         return body
 
-    def list_record_set_zone(self, uuid):
+    def list_record_set_zone(self, uuid, user=None):
         """list recordsets of a zone.
         :param uuid: The unique identifier of the zone.
         """
-        body = self.zones_v2_client.list_recordset_zone(uuid)
+        LOG.info('List zone recordsets')
+        if user is None or user == 'admin':
+            body = self.admin_recordset_client.list_recordset(uuid)
+        elif user == 'primary':
+            body = self.primary_recordset_client.list_recordset(uuid)
+        self.assertGreater(len(body), 0)
+        return body
+
+    def show_ptr_record(self, region, fip_id, user=None):
+        """list ptr recordsets associated with floating ip.
+        :param fip_id: Unique FloatingIP ID.
+        """
+        LOG.info('List ptr recordsets')
+        ptr_id = region + ":" + fip_id
+        body = self.ptr_client.show_ptr_record(ptr_id)
         return body
