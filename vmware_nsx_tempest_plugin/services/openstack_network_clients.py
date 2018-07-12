@@ -12,13 +12,14 @@
 #    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 #    License for the specific language governing permissions and limitations
 #    under the License.
+from designate_tempest_plugin.services.dns.v2.json import base as dns_base
+
 from oslo_log import log
 
 from tempest import config
 from tempest.lib.services.network import base
 
 from vmware_nsx_tempest_plugin.common import constants
-from vmware_nsx_tempest_plugin.common import waiters
 from vmware_nsx_tempest_plugin.services import designate_base
 
 LOG = log.getLogger(__name__)
@@ -428,7 +429,6 @@ class QosPoliciesClient(base.BaseNetworkClient):
         uri = self.resource_base_path
         return self.list_resources(uri, **filters)
 
-
 class ZonesV2Client(designate_base.DnsClientBase):
     """
     Request resources via API for ZonesV2Client
@@ -473,5 +473,18 @@ class ZonesV2Client(designate_base.DnsClientBase):
 
     def list_recordset_zone(self, zone_id):
         request = self.resource_base_path + '/' + zone_id + '/recordsets'
-        resp, body = self._list_request(request)
-        return resp, body
+        resp, body = self._list_re
+
+
+class DesignatePtrClient(dns_base.DnsClientV2Base):
+    """
+    Request resources via API for Designate PTR RecordSet Client
+        PTR recordset show request
+    """
+    path = "reverse/floatingips/"
+
+    def show_ptr_record(self, ptr_id):
+        """
+        Show FloatingIP PTR record
+        """
+        return self._show_request(self.path, ptr_id)
