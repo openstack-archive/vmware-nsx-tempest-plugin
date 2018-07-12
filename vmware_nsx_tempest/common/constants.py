@@ -77,6 +77,7 @@ REJECT = "REJECT"
 
 # ZONE Designate
 ZONE_WAIT_TIME = 120
+REGION_NAME = "RegionOne"
 # VPN
 PEER_ID = "172.24.4.12"
 PFS = "group14"
