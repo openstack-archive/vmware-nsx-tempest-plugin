@@ -124,6 +124,12 @@ class FeatureManager(traffic_manager.IperfManager,
             net_client.region,
             net_client.endpoint_type,
             **_params)
+        cls.ptr_client = openstack_network_clients.DesignatePtrClient(
+            net_client.auth_provider,
+            net_client.service,
+            net_client.region,
+            net_client.endpoint_type,
+            **_params)
 
     #
     # FwaasV2 base class
@@ -944,13 +950,11 @@ class FeatureManager(traffic_manager.IperfManager,
         return email_id
 
     def create_zone(self, name=None, email=None, description=None,
-                    wait_until=False):
+                    wait_until=False, tenant_id=None):
         """Create a zone with the specified parameters.
         :param name: The name of the zone.
             Default: Random Value
         :param email: The email for the zone.
-            Default: Random Value
-        :param ttl: The ttl for the zone.
             Default: Random Value
         :param description: A description of the zone.
             Default: Random Value
@@ -967,7 +971,6 @@ class FeatureManager(traffic_manager.IperfManager,
         _, body = self.zones_v2_client.create_zone(wait_until, **zone)
         self.addCleanup(test_utils.call_and_ignore_notfound_exc,
                         self.delete_zone, body['id'])
-        # Create Zone should Return a HTTP 202
         return body
 
     def delete_zone(self, uuid):
@@ -991,30 +994,18 @@ class FeatureManager(traffic_manager.IperfManager,
         """
         return self.zones_v2_client.list_zones()
 
-    def update_zone(self, uuid, email=None, ttl=None,
-                    description=None, wait_until=False):
-        """Update a zone with the specified parameters.
-        :param uuid: The unique identifier of the zone.
-        :param email: The email for the zone.
-            Default: Random Value
-        :param ttl: The ttl for the zone.
-            Default: Random Value
-        :param description: A description of the zone.
-            Default: Random Value
-        :param wait_until: Block until the zone reaches the desiered status
-        :return: A tuple with the server response and the updated zone.
-        """
-        zone = {
-            'email': email or self.rand_email(),
-            'ttl': ttl or self.rand_ttl(),
-            'description': description or self.rand_name('test-zone'),
-        }
-        _, body = self.zones_v2_client.update_zone(uuid, wait_until, **zone)
-        return body
-
-    def list_record_set_zone(self, uuid):
+    def list_record_set_zone(self, uuid, user=None):
         """list recordsets of a zone.
         :param uuid: The unique identifier of the zone.
         """
         body = self.zones_v2_client.list_recordset_zone(uuid)
+        self.assertGreater(len(body), 0)
+        return body
+
+    def show_ptr_record(self, region, fip_id, user=None):
+        """list ptr recordsets associated with floating ip.
+        :param fip_id: Unique FloatingIP ID.
+        """
+        ptr_id = region + ":" + fip_id
+        body = self.ptr_client.show_ptr_record(ptr_id)
         return body
