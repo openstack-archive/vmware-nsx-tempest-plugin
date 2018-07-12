@@ -12,14 +12,14 @@
 #    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 #    License for the specific language governing permissions and limitations
 #    under the License.
+from designate_tempest_plugin.services.dns.v2.json import base as dns_base
+
 from oslo_log import log
 
 from tempest import config
 from tempest.lib.services.network import base
 
 from vmware_nsx_tempest.common import constants
-from vmware_nsx_tempest.common import waiters
-from vmware_nsx_tempest.services import designate_base
 
 LOG = log.getLogger(__name__)
 CONF = config.CONF
@@ -429,49 +429,15 @@ class QosPoliciesClient(base.BaseNetworkClient):
         return self.list_resources(uri, **filters)
 
 
-class ZonesV2Client(designate_base.DnsClientBase):
+class DesignatePtrClient(dns_base.DnsClientV2Base):
     """
-    Request resources via API for ZonesV2Client
-        zonesv2 create zone
-        zonesv2 update zone
-        zonesv2 delete zone
-        zonesv2 show zone
-        zonesv2 list zones
+    Request resources via API for Designate PTR RecordSet Client
+        PTR recordset show request
     """
-    resource = 'zone'
-    resource_plural = 'policies'
-    path = 'zones'
-    resource_base_path = '/v2/%s' % path
+    path = "reverse/floatingips/"
 
-    def create_zone(self, wait_until, **zone):
-        resp, body = self._create_request(self.resource_base_path, zone)
-        self.expected_success(202, resp.status)
-        if wait_until:
-            waiters.wait_for_zone_status_active(self, body['id'], wait_until)
-        return resp, body
-
-    def update_zone(self, zone_id, wait_until, **zone):
-        resp, body = self._update_request(self.resource_base_path,
-                                          zone_id, zone)
-        # Update Zone should Return a HTTP 202
-        self.expected_success(202, resp.status)
-        if wait_until:
-            waiters.wait_for_zone_status_active(self, body['id'], wait_until)
-        return resp, body
-
-    def show_zone(self, zone_id):
-        return self._show_request(self.resource_base_path, zone_id)
-
-    def delete_zone(self, zone_id):
-        resp, body = self._delete_request(self.resource_base_path, zone_id)
-        # Delete Zone should Return a HTTP 202
-        self.expected_success(202, resp.status)
-        return resp, body
-
-    def list_zones(self):
-        return self._list_request(self.resource_base_path)
-
-    def list_recordset_zone(self, zone_id):
-        request = self.resource_base_path + '/' + zone_id + '/recordsets'
-        resp, body = self._list_request(request)
-        return resp, body
+    def show_ptr_record(self, ptr_id):
+        """
+        Show FloatingIP PTR record
+        """
+        return self._show_request(self.path, ptr_id)
