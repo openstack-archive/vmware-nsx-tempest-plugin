@@ -103,8 +103,12 @@ class ApplianceManager(manager.NetworkScenarioTest):
             tenant_id = routers_client.tenant_id
         router_name_ = constants.APPLIANCE_NAME_STARTS_WITH + router_name
         name = data_utils.rand_name(router_name_)
-        router = routers_client.create_router(
-            name=name, admin_state_up=True, tenant_id=tenant_id)['router']
+        if CONF.network.backend == "nsxv3":
+            router = routers_client.create_router(
+                name=name, admin_state_up=True, tenant_id=tenant_id)['router']
+        elif CONF.network.backend == "nsxv":
+            router = routers_client.create_router(
+                name=name, **kwargs)['router']
         if set_gateway is not False:
             if kwargs.get("enable_snat") is not None:
                 public_network_info = {"external_gateway_info": dict(
@@ -221,8 +225,8 @@ class ApplianceManager(manager.NetworkScenarioTest):
 
             """
             cidr_in_use = \
-                self.os_admin.subnets_client.list_subnets(
-                    tenant_id=tenant_id, cidr=cidr)['subnets']
+                self.os_admin.subnets_client.\
+                list_subnets(tenant_id=tenant_id, cidr=cidr)['subnets']
             return len(cidr_in_use) != 0
 
         if ip_version == 6:
@@ -371,9 +375,9 @@ class ApplianceManager(manager.NetworkScenarioTest):
         return floating_ip
 
     def create_topology_instance(
-            self, server_name, networks, security_groups=None,
+            self, server_name, networks=None, security_groups=None,
             config_drive=None, keypair=None, image_id=None,
-            clients=None, create_floating_ip=True, **kwargs):
+            clients=None, create_floating_ip=True, port=None, **kwargs):
         # Define security group for server.
         if CONF.nsxv3.ens is not True:
             if security_groups:
@@ -403,9 +407,14 @@ class ApplianceManager(manager.NetworkScenarioTest):
         server_name_ = constants.APPLIANCE_NAME_STARTS_WITH + server_name
         # Collect all the networks for server.
         networks_ = []
-        for net in networks:
-            net_ = {"uuid": net["id"]}
-            networks_.append(net_)
+        if networks is not None:
+            for net in networks:
+                net_ = {"uuid": net["id"]}
+                networks_.append(net_)
+        # Deploy instance with port
+        if port is not None:
+            port_ = {"port": port['id']}
+            networks_.append(port_)
         # Deploy server with all the args.
         server = self.create_server(
             name=server_name_, networks=networks_, clients=clients, **kwargs)
@@ -435,12 +444,18 @@ class ApplianceManager(manager.NetworkScenarioTest):
         return server
 
     def create_topology_port(self, network,
-        ports_client=None, **args):
+                             ports_client=None, **args):
         if not ports_client:
             ports_client = self.ports_client
         port = ports_client.create_port(network_id=network['id'], **args)
         self.addCleanup(ports_client.delete_port, port['port']['id'])
         return port
+
+    def update_topology_port(self, port_id, ports_client=None,
+                             **kwargs):
+        if not ports_client:
+            ports_client = self.ports_client
+        ports_client.update_port(port_id, **kwargs)
 
     def _list_ports(self, *args, **kwargs):
         """List ports using admin creds """

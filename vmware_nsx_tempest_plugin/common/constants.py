@@ -90,3 +90,4 @@ LIFETIME = {"units": "seconds", "value": 21600}
 PEER_ADDRESS = "172.24.4.12"
 SITE_CONNECTION_STATE = 'True'
 PSK = "secret"
+CIDR = "22.0.9.0/24"

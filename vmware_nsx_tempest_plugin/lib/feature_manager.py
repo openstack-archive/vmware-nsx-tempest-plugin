@@ -22,18 +22,18 @@ from tempest.lib.common.utils import data_utils
 from tempest.lib.common.utils import test_utils
 from tempest.lib import exceptions as lib_exc
 
-from vmware_nsx_tempest_plugin._i18n import _
-from vmware_nsx_tempest_plugin.common import constants
-from vmware_nsx_tempest_plugin.lib import traffic_manager
-from vmware_nsx_tempest_plugin.services import designate_base
-from vmware_nsx_tempest_plugin.services.lbaas import health_monitors_client
-from vmware_nsx_tempest_plugin.services.lbaas import listeners_client
-from vmware_nsx_tempest_plugin.services.lbaas import load_balancers_client
-from vmware_nsx_tempest_plugin.services.lbaas import members_client
-from vmware_nsx_tempest_plugin.services.lbaas import pools_client
-from vmware_nsx_tempest_plugin.services import nsx_client
-from vmware_nsx_tempest_plugin.services import openstack_network_clients
-
+from vmware_nsx_tempest._i18n import _
+from vmware_nsx_tempest.common import constants
+from vmware_nsx_tempest.lib import traffic_manager
+from vmware_nsx_tempest.services import designate_base
+from vmware_nsx_tempest.services import fwaas_client as FWAASC
+from vmware_nsx_tempest.services.lbaas import health_monitors_client
+from vmware_nsx_tempest.services.lbaas import listeners_client
+from vmware_nsx_tempest.services.lbaas import load_balancers_client
+from vmware_nsx_tempest.services.lbaas import members_client
+from vmware_nsx_tempest.services.lbaas import pools_client
+from vmware_nsx_tempest.services import nsx_client
+from vmware_nsx_tempest.services import openstack_network_clients
 
 LOG = constants.log.getLogger(__name__)
 
@@ -91,6 +91,7 @@ class FeatureManager(traffic_manager.IperfManager,
             net_client.region,
             net_client.endpoint_type,
             **_params)
+        cls.fwaasv1_client = FWAASC.get_client(cls.manager)
         cls.vpnaas_client = openstack_network_clients.VPNClient(
             net_client.auth_provider,
             net_client.service,
@@ -174,6 +175,164 @@ class FeatureManager(traffic_manager.IperfManager,
     def show_firewall_policy(self, policy_id):
         fw_policy = self.fwaas_v2_client.show_firewall_v2_policy(policy_id)
         return fw_policy
+
+    #
+    # FwaasV1 base class
+    #
+    def _create_firewall_rule_name(self, body):
+        firewall_rule_name = body['firewall_rule']['name']
+        firewall_rule_name = "Fwaas-" + firewall_rule_name
+        return firewall_rule_name
+
+    def _delete_rule_if_exists(self, rule_id):
+        # delete rule, if it exists
+        try:
+            self.fwaasv1_client.delete_firewall_rule(rule_id)
+        # if rule is not found, this means it was deleted in the test
+        except lib_exc.NotFound:
+            pass
+
+    def _delete_firewall_if_exists(self, fw_id):
+        # delete firewall, if it exists
+        try:
+            self.fwaasv1_client.delete_firewall(fw_id)
+        # if firewall is not found, this means it was deleted in the test
+        except lib_exc.NotFound:
+            pass
+        self.fwaasv1_client.wait_for_resource_deletion(fw_id)
+
+    def create_fw_v1_rule(self, **kwargs):
+        body = self.fwaasv1_client.create_firewall_rule(
+            name=data_utils.rand_name("fw-rule"),
+            **kwargs)
+        fw_rule = body['firewall_rule']
+        self.addCleanup(test_utils.call_and_ignore_notfound_exc,
+                        self.fwaasv1_client.delete_firewall_rule,
+                        fw_rule['id'])
+        return fw_rule
+
+    def create_fw_v1_policy(self, **kwargs):
+        body = self.fwaasv1_client.create_firewall_policy(
+            name=data_utils.rand_name("fw-policy"),
+            **kwargs)
+        fw_policy = body['firewall_policy']
+        self.addCleanup(test_utils.call_and_ignore_notfound_exc,
+                        self.fwaasv1_client.delete_firewall_policy,
+                        fw_policy['id'])
+        return fw_policy
+
+    def insert_fw_v1_rule_in_policy(self, firewall_policy_id, firewall_rule_id,
+                                    insert_after, insert_before):
+        self.fwaasv1_client.insert_firewall_rule_in_policy(firewall_policy_id,
+                                                           firewall_rule_id,
+                                                           insert_after,
+                                                           insert_before)
+
+    def delete_fw_v1_and_wait(self, firewall_id):
+        self.fwaasv1_client.delete_firewall(firewall_id)
+        self._wait_firewall_while(firewall_id, [nl_constants.PENDING_DELETE],
+                                  not_found_ok=True)
+
+    def _delete_policy_if_exists(self, policy_id):
+        # delete policy, if it exists
+        try:
+            self.fwaasv1_client.delete_firewall_policy(policy_id)
+        # if policy is not found, this means it was deleted in the test
+        except lib_exc.NotFound:
+            pass
+
+    def create_fw_v1(self, **kwargs):
+        body = self.fwaasv1_client.create_firewall(
+            name=data_utils.rand_name("fw"),
+            **kwargs)
+        fw = body['firewall']
+        self.addCleanup(test_utils.call_and_ignore_notfound_exc,
+                        self.delete_fw_v1_and_wait,
+                        fw['id'])
+        return fw
+
+    def update_fw_v1(self, firewall_id, **kwargs):
+        body = self.fwaasv1_client.update_firewall(firewall_id, **kwargs)
+        return body
+
+    def show_fw_v1(self, firewall_id):
+        body = self.fwaasv1_client.show_firewall(firewall_id)
+        return body
+
+    def _wait_fw_v1_while(self, firewall_id, statuses, not_found_ok=False):
+        start = int(time.time())
+        if not_found_ok:
+            expected_exceptions = (lib_exc.NotFound)
+        else:
+            expected_exceptions = ()
+        while True:
+            try:
+                fw = self.fwaasv1_client.show_firewall(firewall_id)
+            except expected_exceptions:
+                break
+            status = fw['firewall']['status']
+            if status not in statuses:
+                break
+            if int(time.time()) - start >= self.fwaasv1_client.build_timeout:
+                msg = ("Firewall %(firewall)s failed to reach "
+                       "non PENDING status (current %(status)s)") % {
+                    "firewall": firewall_id,
+                    "status": status,
+                }
+                raise lib_exc.TimeoutException(msg)
+            time.sleep(constants.NSX_BACKEND_VERY_SMALL_TIME_INTERVAL)
+
+    def _wait_fw_v1_ready(self, firewall_id):
+        self._wait_firewall_while(firewall_id,
+                                  [nl_constants.PENDING_CREATE,
+                                   nl_constants.PENDING_UPDATE])
+
+    def _wait_fw_v1_until_ready(self, fw_id):
+        target_states = ('ACTIVE', 'CREATED')
+
+        def _wait():
+            firewall = self.fwaasv1_client.show_firewall(fw_id)
+            firewall = firewall['firewall']
+            return firewall['status'] in target_states
+        if not test_utils.call_until_true(_wait, CONF.network.build_timeout,
+                                          CONF.network.build_interval):
+            m = ("Timed out waiting for firewall %s to reach %s state(s)" %
+                 (fw_id, target_states))
+            raise lib_exc.TimeoutException(m)
+
+    def create_fw_v1_basic_topo(self, router_type, protocol_name,
+                                policy=None):
+        rtr_kwargs = {"router_type": "exclusive",
+                      "admin_state_up": "True"}
+        router = self.create_topology_router("fire-1", **rtr_kwargs)
+        body = self.fwaasv1_client.create_fw_v1_rule(
+            name=data_utils.rand_name("fw-rule"),
+            action="allow",
+            protocol=protocol_name)
+        fw_rule_id1 = body['firewall_rule']['id']
+        self._create_firewall_rule_name(body)
+        self.addCleanup(self._delete_rule_if_exists, fw_rule_id1)
+        # Create firewall policy
+        if not policy:
+            body = self.fwaasv1_client.create_fw_v1_policy(
+                name=data_utils.rand_name("fw-policy"))
+            fw_policy_id = body['firewall_policy']['id']
+            self.addCleanup(self._delete_policy_if_exists, fw_policy_id)
+            # Insert rule to firewall policy
+            self.fwaasv1_client.insert_firewall_rule_in_policy(
+                fw_policy_id, fw_rule_id1, '', '')
+        else:
+            fw_policy_id = policy
+        # Create firewall
+        firewall_1 = self.fwaasv1_client.create_fw_v1(
+            name=data_utils.rand_name("firewall"),
+            firewall_policy_id=fw_policy_id,
+            router_ids=[router['id']])
+        created_firewall = firewall_1['firewall']
+        self.addCleanup(self._delete_firewall_if_exists,
+                        created_firewall['id'])
+        # Wait for the firewall resource to become ready
+        self._wait_fw_v1_until_ready(created_firewall['id'])
 
     #
     # L2Gateway base class. To get basics of L2GW.
