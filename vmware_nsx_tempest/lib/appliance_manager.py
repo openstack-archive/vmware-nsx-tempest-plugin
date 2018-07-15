@@ -221,8 +221,8 @@ class ApplianceManager(manager.NetworkScenarioTest):
 
             """
             cidr_in_use = \
-                self.os_admin.subnets_client.list_subnets(
-                    tenant_id=tenant_id, cidr=cidr)['subnets']
+                self.os_admin.subnets_client.\
+                list_subnets(tenant_id=tenant_id, cidr=cidr)['subnets']
             return len(cidr_in_use) != 0
 
         if ip_version == 6:
@@ -435,12 +435,18 @@ class ApplianceManager(manager.NetworkScenarioTest):
         return server
 
     def create_topology_port(self, network,
-        ports_client=None, **args):
+                             ports_client=None, **args):
         if not ports_client:
             ports_client = self.ports_client
         port = ports_client.create_port(network_id=network['id'], **args)
         self.addCleanup(ports_client.delete_port, port['port']['id'])
         return port
+
+    def update_topology_port(self, port_id, ports_client=None,
+                             **kwargs):
+        if not ports_client:
+            ports_client = self.ports_client
+        ports_client.update_port(port_id, **kwargs)
 
     def _list_ports(self, *args, **kwargs):
         """List ports using admin creds """
