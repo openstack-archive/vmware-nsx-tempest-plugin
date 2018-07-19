@@ -316,8 +316,13 @@ class ApplianceManager(manager.NetworkScenarioTest):
         return sg
 
     def _get_server_portid_and_ip4(self, server, ip_addr=None):
-        ports = self.os_admin.ports_client.list_ports(
-            device_id=server['id'], fixed_ip=ip_addr)['ports']
+        if ip_addr:
+            ports = self.os_admin.ports_client.list_ports(
+                device_id=server['id'],
+                fixed_ips='ip_address=%s' % ip_addr)['ports']
+        else:
+            ports = self.os_admin.ports_client.list_ports(
+                device_id=server['id'])['ports']
         p_status = ['ACTIVE']
         if getattr(CONF.service_available, 'ironic', False):
             p_status.append('DOWN')
