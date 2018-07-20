@@ -291,10 +291,12 @@ class IperfManager(TrafficManager):
 
         if self.traffic == 'udp':
             cmd = ('iperf -p 49162 -c %s -b %sM -t 1 -u | grep %%'
-                   % (unicode(destination_ip), unicode(traffic_send_rate)))
+                   % (unicode(destination_ip),  # noqa
+                      unicode(traffic_send_rate)))  # noqa
         else:
             cmd = ('iperf -p 49162 -c %s -b %sM -t 1 '
-                   % (unicode(destination_ip), unicode(traffic_send_rate)))
+                   % (unicode(destination_ip),  # noqa
+                      unicode(traffic_send_rate)))  # noqa
         output = ssh_source.exec_command(cmd)
         if output is None or float(output.split()[7]) < 0:
             LOG.error('Incorrect IPERF output %s' % output)
@@ -310,7 +312,7 @@ class IperfManager(TrafficManager):
             if 'iperf -p 49162 -s' in line:
                 LOG.info("Killing iperf process")
                 iperf_process_id = line.split()[1]
-                cmd = ('kill %s' % (unicode(iperf_process_id)))
+                cmd = ('kill %s' % (unicode(iperf_process_id)))  # noqa
                 ssh_source.exec_command(cmd)
 
     def kill_tcpdump_process(self, ssh_source):
@@ -321,7 +323,7 @@ class IperfManager(TrafficManager):
             if 'tcpdump -ni eth0 -w' in line:
                 LOG.info("Killing TCPDUMP process")
                 tcpdump_process_id = line.split()[1]
-                cmd = ('kill %s' % (unicode(tcpdump_process_id)))
+                cmd = ('kill %s' % (unicode(tcpdump_process_id)))  # noqa
                 ssh_source.exec_command(cmd)
 
     def use_iperf_send_traffic(
