@@ -241,8 +241,8 @@ class L2GatewayConnectionTest(base.BaseAdminNetworkTest):
         (_gw, _seg_list) = self.create_l2gw_switch(_name, _devices)
         (_res_new, _seg_id_list) = self.create_l2gw_connection(_gw)
         _seg_id_list = _res_new.get('segmentation_id')
-        self.assertEqaul(0, cmp(_vlan_id_list, _seg_id_list),
-                         MSG_DIFF % ('vlan', _vlan_id_list, _seg_id_list))
+        self.assertItemsEqual(_vlan_id_list, _seg_id_list,
+                              MSG_DIFF % ('vlan', _vlan_id_list, _seg_id_list))
         self.do_suld_l2gw_connection(_res_new)
         self.addCleanup(self.l2gw_cleanup)
 
