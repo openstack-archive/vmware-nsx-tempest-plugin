@@ -108,14 +108,15 @@ class L2GatewayTest(base.BaseAdminNetworkTest):
                          MSG_DIFF % ('name', _res_new['name'], _name))
         # w/wo vlan provided, need to check it is assigned/not-assigned
         _seg_list = self.get_segmentation_id(_res_new, 0, 0)
-        self.assertEqual(0, cmp(_vlan_id_list, _seg_list),
-                         MSG_DIFF % ('vlan', _seg_list, _vlan_id_list))
+        self.assertItemsEqual(_vlan_id_list, _seg_list,
+                              MSG_DIFF % ('vlan', _seg_list, _vlan_id_list))
         _res_show = self.l2gw_client.show_l2_gateway(
             _res_new['id'])[L2GW_RID]
         _if_created = _res_new['devices'][0]['interfaces']
         _if_shown = _res_show['devices'][0]['interfaces']
-        self.assertEqual(0, cmp(_if_created, _if_shown),
-                         MSG_DIFF % ('interfaces', _if_created, _if_shown))
+        self.assertItemsEqual(_if_created, _if_shown,
+                              MSG_DIFF % ('interfaces',
+                                          _if_created, _if_shown))
         _name2 = _name + "-day2"
         _res_upd = self.l2gw_client.update_l2_gateway(
             _res_new['id'], name=_name2)[L2GW_RID]
