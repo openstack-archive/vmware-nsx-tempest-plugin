@@ -61,11 +61,11 @@ Installation:
 
     Location: /opt/stack/vmware-nsx-tempest-plugin
 
-#. Validate installed vmware_nsx_tempest successfully do::
+#. Validate installed vmware_nsx_tempest_plugin successfully do::
 
     $ cd /opt/stack/vmware-nsx-tempest-plugin
-    $ ostestr -l vmware_nsx_tempest
-    $ ostestr vmware_nsx_tempest.tests.nsxv3.scenario.test_mdproxy.TestMDProxy.test_mdproxy_ping
+    $ ostestr -l vmware_nsx_tempest_plugin
+    $ ostestr vmware_nsx_tempest_plugin.tests.nsxv3.scenario.test_mdproxy.TestMDProxy.test_mdproxy_ping
     $ python -m testtools.run vmware_nsx_tempest.tests.nsxv3.scenario.test_mdproxy.TestMDProxy.test_mdproxy_ping
 
 Your installation failed, if no tests are shown.
@@ -77,8 +77,8 @@ vmware-nsx-tempest tests are tempest tests, you need to
 run from tempest directory. For example, to run only l2-gateway tests::
 
     $ cd /opt/stack/tempest
-    $ ostestr vmware_nsx_tempest.*test_l2_gateway
-    $ ostestr vmware_nsx_tempest.tests.nsxv.api.test_l2_gateway_connection.L2GatewayConnectionTest.test_csuld_single_device_interface_vlan
+    $ ostestr vmware_nsx_tempest_plugin.*test_l2_gateway
+    $ ostestr vmware_nsx_tempest_plugin.tests.nsxv.api.test_l2_gateway_connection.L2GatewayConnectionTest.test_csuld_single_device_interface_vlan
 
 TechNote on vmware-nsx-tempest-plugin:
 =========================================
