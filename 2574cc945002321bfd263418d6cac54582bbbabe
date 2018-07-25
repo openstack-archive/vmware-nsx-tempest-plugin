@@ -1,0 +1,9 @@
+Code-Review+2: boden <bodenvmw@gmail.com>
+Code-Review+2: Adit Sarfaty <asarfaty@vmware.com>
+Workflow+1: Adit Sarfaty <asarfaty@vmware.com>
+Verified+2: Zuul
+Submitted-by: Zuul
+Submitted-at: Wed, 25 Jul 2018 08:19:01 +0000
+Reviewed-on: https://review.openstack.org/580050
+Project: openstack/vmware-nsx-tempest-plugin
+Branch: refs/heads/master
