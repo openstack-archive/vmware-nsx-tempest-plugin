@@ -1,0 +1,9 @@
+Code-Review+2: boden <bodenvmw@gmail.com>
+Code-Review+2: Deepthi Kandavara Jayarama <dkandavarajay@vmware.com>
+Workflow+1: Deepthi Kandavara Jayarama <dkandavarajay@vmware.com>
+Verified+2: Zuul
+Submitted-by: Zuul
+Submitted-at: Tue, 31 Jul 2018 19:58:26 +0000
+Reviewed-on: https://review.openstack.org/584976
+Project: openstack/vmware-nsx-tempest-plugin
+Branch: refs/heads/master
