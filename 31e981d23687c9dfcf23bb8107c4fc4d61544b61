@@ -1,0 +1,8 @@
+Code-Review+2: boden <bodenvmw@gmail.com>
+Workflow+1: boden <bodenvmw@gmail.com>
+Verified+2: Zuul
+Submitted-by: Zuul
+Submitted-at: Tue, 31 Jul 2018 17:04:31 +0000
+Reviewed-on: https://review.openstack.org/584500
+Project: openstack/vmware-nsx-tempest-plugin
+Branch: refs/heads/master
