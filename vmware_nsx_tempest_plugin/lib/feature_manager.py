@@ -46,6 +46,7 @@ RULE_TYPE_DSCP_MARK = "dscp_marking"
 # It includes feature related function such CRUD Mdproxy, L2GW or QoS
 class FeatureManager(traffic_manager.IperfManager,
                      designate_base.DnsClientBase):
+
     @classmethod
     def setup_clients(cls):
         """Create various client connections. Such as NSXv3 and L2 Gateway.
@@ -477,6 +478,15 @@ class FeatureManager(traffic_manager.IperfManager,
         lbs = lb_client.list_load_balancers()['loadbalancers']
         self.assertEqual(0, len(lbs))
 
+    def delete_lb_pool_healthmonitor(self, pool):
+        """Deletion of lb health pool and monitor.
+        """
+        test_utils.call_and_ignore_notfound_exc(
+            self.health_monitors_client.delete_health_monitor,
+            pool.get('pool')['healthmonitor_id'])
+        test_utils.call_and_ignore_notfound_exc(
+            self.pools_client.delete_pool, pool.get('pool')['id'])
+
     def delete_lb_pool_resources(self, lb_id, pool):
         """Deletion of lbaas pool resources.
 
@@ -683,7 +693,11 @@ class FeatureManager(traffic_manager.IperfManager,
             self.create_floatingip(self.loadbalancer,
                                    port_id=self.loadbalancer['vip_port_id'])
         self.vip_ip_address = vip_fip['floating_ip_address']
-        return self.vip_ip_address
+        pools = self.pools_client.show_pool(
+            self.pool['id'])
+        return dict(lb_id=lb_id, pool=pools,
+                    vip_port=self.loadbalancer['vip_port_id'],
+                    vip_ip=self.vip_ip_address)
 
     def get_router_port(self, client):
         """List ports using admin creds """

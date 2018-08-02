@@ -21,6 +21,7 @@ from vmware_nsx_tempest_plugin.lib import feature_manager
 from tempest.common import waiters
 from tempest import config
 from tempest.lib import decorators
+from tempest.lib import exceptions
 from tempest import test
 
 
@@ -29,6 +30,7 @@ CONF = config.CONF
 
 
 class LBaasRoundRobinBaseTest(feature_manager.FeatureManager):
+
     """Base class to support LBaaS ROUND-ROBIN test.
 
     It provides the methods to create loadbalancer network, and
@@ -113,13 +115,15 @@ class LBaasRoundRobinBaseTest(feature_manager.FeatureManager):
                             port_range_min=443, port_range_max=443, )]
         for rule in lbaas_rules:
             self.add_security_group_rule(self.sg, rule)
-        self.create_topology_subnet(
+        subnet_lbaas = self.create_topology_subnet(
             "subnet_lbaas_1", network_lbaas_1, router_id=router_lbaas["id"])
         for instance in range(0, no_of_servers):
             self.create_topology_instance(
                 "server_lbaas_%s" % instance, [network_lbaas_1],
                 security_groups=[{'name': self.sg['name']}],
                 image_id=image_id)
+        return dict(router=router_lbaas, subnet=subnet_lbaas,
+                    network=network_lbaas_1)
 
     @decorators.attr(type='nsxv3')
     @decorators.idempotent_id('c5ac853b-6867-4b7a-8704-3844b11b1a34')
@@ -249,3 +253,35 @@ class LBaasRoundRobinBaseTest(feature_manager.FeatureManager):
         self.create_addtional_lbaas_members(constants.HTTP_PORT)
         time.sleep(constants.SLEEP_BETWEEN_VIRTUAL_SEREVRS_OPEARTIONS)
         self.check_project_lbaas(constants.NO_OF_VMS_4)
+
+    @decorators.attr(type='nsxv')
+    @decorators.idempotent_id('1839d22d-4da2-460e-9c5b-bd8ddc1d35b6')
+    def test_user_not_able_to_update_lb_port(self):
+        """
+        Admin user shouldn't be able to update Lb internal ports
+        """
+        self.deploy_lbaas_topology()
+        lb = self.create_project_lbaas(
+            protocol_type="HTTP", protocol_port="80",
+            lb_algorithm="ROUND_ROBIN", hm_type='PING')
+        kwargs = {"admin_state_up": True}
+        self.assertRaises(exceptions.BadRequest,
+                          self.manager.ports_client.update_port(lb['vip_port'],
+                                                                **kwargs))
+
+    @decorators.attr(type='nsxv3')
+    @decorators.idempotent_id('98e1d22d-4da2-460e-9c5b-bd8ddc1d35b6')
+    def test_delete_router_attaching_to_lb(self):
+        """
+        Delete tier-1 router when Lb is attached to it
+        """
+        lb_topo = self.deploy_lbaas_topology()
+        if not CONF.nsxv3.ens:
+            self.start_web_servers(constants.HTTP_PORT)
+        lb = self.create_project_lbaas(
+            protocol_type="HTTP", protocol_port="80",
+            lb_algorithm="ROUND_ROBIN", hm_type='PING')
+        self.delete_lb_pool_healthmonitor(lb['pool'])
+        self.assertRaises(exceptions.BadRequest, self.remove_router_interface,
+                          lb_topo.get('router')['id'],
+                          lb_topo.get('subnet')['id'])
