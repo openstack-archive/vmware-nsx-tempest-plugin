@@ -328,8 +328,8 @@ class ApplianceManager(manager.NetworkScenarioTest):
         port_map = [(p["id"], fxip["ip_address"])
                     for p in ports
                     for fxip in p["fixed_ips"]
-                    if netutils.is_valid_ipv4(fxip["ip_address"])
-                    and p['status'] in p_status]
+                    if netutils.is_valid_ipv4(fxip["ip_address"]) and
+                    p['status'] in p_status]
         inactive = [p for p in ports if p['status'] != 'ACTIVE']
         if inactive:
             LOG.warning("Instance has ports that are not ACTIVE: %s", inactive)
@@ -355,19 +355,24 @@ class ApplianceManager(manager.NetworkScenarioTest):
         subnet = result['subnet']
         return subnet
 
-    def create_floatingip(self, thing, port_id, external_network_id=None,
+    def create_floatingip(self, thing=None, port_id=None,
+                          external_network_id=None,
                           ip4=None, client=None):
         """Create a floating IP and associates to a resource/port on Neutron"""
         if not external_network_id:
             external_network_id = self.topology_public_network_id
         if not client:
             client = self.floating_ips_client
-        result = client.create_floatingip(
-            floating_network_id=external_network_id,
-            port_id=port_id,
-            tenant_id=thing['tenant_id'],
-            fixed_ip_address=ip4
-        )
+        if thing is None and port_id is None:
+            result = client.create_floatingip(
+                floating_network_id=external_network_id)
+        else:
+            result = client.create_floatingip(
+                floating_network_id=external_network_id,
+                port_id=port_id,
+                tenant_id=thing['tenant_id'],
+                fixed_ip_address=ip4
+            )
         floating_ip = result['floatingip']
         self.addCleanup(test_utils.call_and_ignore_notfound_exc,
                         client.delete_floatingip,
@@ -375,9 +380,9 @@ class ApplianceManager(manager.NetworkScenarioTest):
         return floating_ip
 
     def create_topology_instance(
-            self, server_name, networks, security_groups=None,
+            self, server_name, networks=None, security_groups=None,
             config_drive=None, keypair=None, image_id=None,
-            clients=None, create_floating_ip=True, **kwargs):
+            clients=None, create_floating_ip=True, port=None, **kwargs):
         # Define security group for server.
         if CONF.nsxv3.ens is not True:
             if security_groups:
@@ -407,9 +412,14 @@ class ApplianceManager(manager.NetworkScenarioTest):
         server_name_ = constants.APPLIANCE_NAME_STARTS_WITH + server_name
         # Collect all the networks for server.
         networks_ = []
-        for net in networks:
-            net_ = {"uuid": net["id"]}
-            networks_.append(net_)
+        if networks is not None:
+            for net in networks:
+                net_ = {"uuid": net["id"]}
+                networks_.append(net_)
+        # Deploy instance with port
+        if port is not None:
+            port_ = {"port": port['id']}
+            networks_.append(port_)
         # Deploy server with all the args.
         server = self.create_server(
             name=server_name_, networks=networks_, clients=clients, **kwargs)
