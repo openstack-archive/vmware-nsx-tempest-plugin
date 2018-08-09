@@ -70,17 +70,21 @@ class TestNewCase(feature_manager.FeatureManager):
         subnet_state = self.create_topology_subnet(subnet_name, network_state,
                                                    router_id=router_state["id"]
                                                    )
+        vm_1_state = None
+        vm_2_state = None
         if create_instance:
             image_id = self.get_glance_image_id(["cirros", "esx"])
-            self.create_topology_instance(
-                "state_vm_1", [network_state],
-                create_floating_ip=True, image_id=image_id)
-            self.create_topology_instance(
-                "state_vm_2", [network_state],
-                create_floating_ip=True, image_id=image_id)
+            vm_1_state = self.create_topology_instance(
+                             "state_vm_1", [network_state],
+                             create_floating_ip=True, image_id=image_id)
+            vm_2_state = self.create_topology_instance(
+                             "state_vm_2", [network_state],
+                             create_floating_ip=True, image_id=image_id)
         topology_dict = dict(router_state=router_state,
                              network_state=network_state,
-                             subnet_state=subnet_state)
+                             subnet_state=subnet_state,
+                             vm_1_state=vm_1_state,
+                             vm_2_state=vm_2_state)
         return topology_dict
 
     def create_topo_across_networks(self, namestart, create_instance=True):
@@ -647,3 +651,44 @@ class TestNewCase(feature_manager.FeatureManager):
         # Update router from distributed to shared should be restricted
         self.assertRaises(exceptions.BadRequest, self.update_topology_router,
                           router_id, **kwargs)
+
+    @decorators.attr(type='nsxv3')
+    @decorators.idempotent_id('8816016b-91cc-8905-b218-12344caa9312')
+    def test_allowed_address_pair_changing_ip(self):
+        """
+        Test ping between VMs after changing to some other IP
+        than allowed address pair
+        """
+        topology_dict = self.create_topo_single_network(
+            "instance_port", create_instance=True)
+        vm_1_state = topology_dict['vm_1_state']
+        vm_2_state = topology_dict['vm_2_state']
+        ip_address_vm1 = '77.0.0.3'
+        ip_address_vm2 = '77.0.0.4'
+        vm_1_port_id = vm_1_state['floating_ips'][0]['port_id']
+        vm_2_port_id = vm_2_state['floating_ips'][0]['port_id']
+        p_client = self.ports_client
+        allowed_address_pairs = [{'ip_address': ip_address_vm1}]
+        p_client.update_port(
+            vm_1_port_id, allowed_address_pairs=allowed_address_pairs)
+        allowed_address_pairs = [{'ip_address': ip_address_vm2}]
+        p_client.update_port(
+            vm_2_port_id, allowed_address_pairs=allowed_address_pairs)
+        ssh_client1 = self.verify_server_ssh(vm_1_state)
+        ssh_client2 = self.verify_server_ssh(vm_2_state)
+        self.assign_ip_address(ssh_client1, 'eth0:1', ip_address_vm1)
+        self.assign_ip_address(ssh_client2, 'eth0:1', ip_address_vm2)
+        self.assertTrue(self._check_remote_connectivity
+                        (ssh_client2, ip_address_vm1, 'True'),
+                        'Destination is unreachable')
+        self.assertTrue(self._check_remote_connectivity
+                        (ssh_client1, ip_address_vm2, 'True'),
+                        'Destination is unreachable')
+        ip_address_vm1 = '77.0.0.5'
+        self.assign_ip_address(ssh_client1, 'eth0:1', ip_address_vm1)
+        self.assertFalse(self._check_remote_connectivity
+                        (ssh_client2, ip_address_vm1, 'True'),
+                        'Destination is reachable')
+        self.assertFalse(self._check_remote_connectivity
+                        (ssh_client1, ip_address_vm2, 'True'),
+                        'Destination is reachable')
