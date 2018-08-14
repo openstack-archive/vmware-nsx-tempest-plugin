@@ -325,15 +325,11 @@ class QosPolicyTest(BaseQosTest):
     @decorators.idempotent_id('9efe63d0-836f-4cc2-b00c-468e63aa614e')
     def test_policy_association_with_network_nonexistent_policy(self):
         """Can not attach network to a nonexist policy."""
-        network = self.create_network(
+        self.assertRaises(
+            exceptions.NotFound,
+            self.create_network,
             'test network',
             qos_policy_id='9efe63d0-836f-4cc2-b00c-468e63aa614e')
-        self.addCleanup(test_utils.call_and_ignore_notfound_exc,
-                        self.delete_network, network['id'])
-        retrieved_network = self.show_network(network['id'])
-        # check if network is not attached to the policy
-        self.assertIsNone(retrieved_network['qos_policy_id'],
-                          'Error: Network is attached to non-existent policy')
 
     @decorators.attr(type='negative')
     @decorators.idempotent_id('1aa55a79-324f-47d9-a076-894a8fc2448b')
@@ -342,19 +338,11 @@ class QosPolicyTest(BaseQosTest):
         policy = self.create_qos_policy(name='test-policy',
                                         description='test policy',
                                         shared=False)
-        self.addCleanup(test_utils.call_and_ignore_notfound_exc,
-                        self.adm_qos_client.delete_policy, policy['id'])
-        network = self.create_network(
-            'test network',
-            qos_policy_id=policy['id'],
+        self.assertRaises(
+            exceptions.NotFound,
+            self.create_network,
+            'test network', qos_policy_id=policy['id'],
             client_mgr=self.primary_mgr)
-        self.addCleanup(test_utils.call_and_ignore_notfound_exc,
-                        self.delete_network, network['id'])
-        retrieved_network = self.show_network(network['id'],
-                                              client_mgr=self.primary_mgr)
-        # check if network is not attached to the policy
-        self.assertIsNone(retrieved_network['qos_policy_id'],
-                          'Error: Network is attached to QoS policy')
 
     @decorators.idempotent_id('10a9392c-1359-4cbb-989f-fb768e5834a8')
     def test_policy_update_association_with_admin_network(self):
