@@ -29,10 +29,11 @@ from vmware_nsx_tempest_plugin.services import nsxv_client
 CONF = config.CONF
 VLAN_ID_PROVIDER = CONF.nsxv.provider_vlan_id
 
+
 class TestNewCase(feature_manager.FeatureManager):
 
-    """Test New Cases Scenario
-
+    """
+    Test New Cases Scenario
     """
     @classmethod
     def setup_clients(cls):
@@ -105,12 +106,15 @@ class TestNewCase(feature_manager.FeatureManager):
                                                     **kwargs)
         network_state1 = self.create_topology_network(network_name1)
         network_state2 = self.create_topology_network(network_name2)
-        subnet_state1 = self.create_topology_subnet(subnet_name1,
-                                                    network_state1,
-                                                    router_id=router_state["id"])
-        subnet_state2 = self.create_topology_subnet(subnet_name2, network_state2,
-                                                    router_id=router_state2["id"],
-                                                    cidr="22.0.9.0/24")
+        subnet_state1 = self.create_topology_subnet(
+                                            subnet_name1,
+                                            network_state1,
+                                            router_id=router_state["id"])
+        subnet_state2 = self.create_topology_subnet(
+                                           subnet_name2,
+                                           network_state2,
+                                           router_id=router_state2['id'],
+                                           cidr='22.0.9.0/24')
         if create_instance:
             image_id = self.get_glance_image_id(['cirros'])
             self.create_topology_instance(
@@ -691,8 +695,7 @@ class TestNewCase(feature_manager.FeatureManager):
         self.assertRaises(exceptions.BadRequest, self.update_topology_router,
                           router_id, **kwargs)
 
-    @decorators.attr(type='nsxv')
-    @decorators.idempotent_id('2226016a-92cc-5098-b217-12344caa24a1')
+    @decorators.idempotent_id('2226016a-91cc-8905-b217-12344caa24a1')
     def test_vm_esx_traffic_provider_network_vlan(self):
         """
            Create VLAN provider network with dvs as physical network
@@ -735,15 +738,15 @@ class TestNewCase(feature_manager.FeatureManager):
         ssh_source = self._get_remote_client(ip_address, use_password=True)
         remote_ip = vm2.values()[1].values()[0][0]['addr']
         should_connect = True
-        #Verify connectivity between vms
+#       Verify connectivity between vms
         self.check_remote_connectivity(ssh_source, remote_ip, should_connect)
 
-    @decorators.attr(type='nsxv')
-    @decorators.idempotent_id('2226016a-93cc-5099-b217-12344caa24a1')
+    @decorators.idempotent_id('2226016a-90dd-0987-b217-12344caa24a1')
     def test_vm_esx_traffic_provider_network_vxlan(self):
         """
-           Create a vxlan provider network and verify default physical network is
-           vdnscope and create instances of ESX image and check traffic
+           Create a vxlan provider network and verify
+           default physical network is vdnscope and
+           create instances of ESX image and check traffic
         """
         sec_rule_client = self.cmgr_adm.security_group_rules_client
         sec_client = self.cmgr_adm.security_groups_client
@@ -760,7 +763,7 @@ class TestNewCase(feature_manager.FeatureManager):
         network = self.create_topology_network(name,
                                                networks_client=networks_client,
                                                **body)
-        #Verify default physical network is vdnscope, not dvs
+#       Verify default physical network is vdnscope, not dvs
         self.assertIn('vdnscope', network['provider:physical_network'])
         subnet_name = network['name'] + 'sub'
         self.create_topology_subnet(subnet_name, network,
@@ -784,14 +787,15 @@ class TestNewCase(feature_manager.FeatureManager):
         ssh_source = self._get_remote_client(ip_address, use_password=True)
         remote_ip = vm2.values()[1].values()[0][0]['addr']
         should_connect = True
-        #Verify Connectivity between vms
+#       Verify Connectivity between vms
         self.check_remote_connectivity(ssh_source, remote_ip, should_connect)
 
     @decorators.attr(type='nsxv')
-    @decorators.idempotent_id('2226016a-94cc-6000-217-12344caa24a1')
+    @decorators.idempotent_id('2226016a-91cc-8905-b217-12344caa24a1')
     def test_firewall_witout_policy_added_to_router_active(self):
         """
-        create two routers and two subnets[each router connected to a different subnet]
+        create two routers and two subnets[each router
+        connected to a different subnet].
         create two firewalls, one connected to each router,
         remove firewall from one router and connect it to another router
         the firewall should remain ACTIVE
@@ -799,12 +803,14 @@ class TestNewCase(feature_manager.FeatureManager):
         kwargs = {"distributed": "true",
                   "admin_state_up": "True"}
         name = "rtr-topo"
-        topology_dict = self.create_topo_two_routers_two_networks(name,
-                                                                  create_instance=True,
-                                                                  set_gateway=True, **kwargs)
+        topology_dict = self.create_topo_two_routers_two_networks(
+                                            name,
+                                            create_instance=True,
+                                            set_gateway=True,
+                                            **kwargs)
         router_id1 = topology_dict['router_state']['id']
         router_id2 = topology_dict['router_state2']['id']
-        #Create Firewall1 and add it to the router1's interface
+#       Create Firewall1 and add it to the router1's interface
         body = self.create_fw_v1_policy()
         fw_policy_id = body['id']
         firewall_1 = self.create_fw_v1(
@@ -813,7 +819,7 @@ class TestNewCase(feature_manager.FeatureManager):
         time.sleep(constants.NSX_BACKEND_SMALL_TIME_INTERVAL)
         firewall_info = self.show_fw_v1(firewall_1['id'])
         self.assertIn("ACTIVE", firewall_info['firewall']['status'])
-        #Create Firewall2 and add it to the router2's interface
+#       Create Firewall2 and add it to the router2's interface
         body2 = self.create_fw_v1_policy()
         fw_policy_id2 = body2['id']
         firewall_2 = self.create_fw_v1(
@@ -822,11 +828,11 @@ class TestNewCase(feature_manager.FeatureManager):
         time.sleep(constants.NSX_BACKEND_SMALL_TIME_INTERVAL)
         firewall_info = self.show_fw_v1(firewall_2['id'])
         self.assertIn("ACTIVE", firewall_info['firewall']['status'])
-        #Delete router1 from firewall1
+#       Delete router1 from firewall1
         kwargs = {"router_ids": []}
         self.update_fw_v1(firewall_1['id'], **kwargs)
         time.sleep(constants.NSX_BACKEND_TIME_INTERVAL)
-        #Add firewall2 to router1
+#       Add firewall2 to router1
         kwargs = {"router_ids": [router_id1]}
         self.update_fw_v1(firewall_2['id'], **kwargs)
         time.sleep(constants.NSX_BACKEND_TIME_INTERVAL)
