@@ -40,6 +40,11 @@ class TestNewCase(feature_manager.FeatureManager):
         cls.cmgr_adm = cls.get_client_manager('admin')
         cls.cmgr_alt = cls.get_client_manager('alt')
         cls.cmgr_adm = cls.get_client_manager('admin')
+        cls.routers_client = cls.cmgr_adm.routers_client
+        cls.networks_client = cls.cmgr_adm.networks_client
+        cls.subnets_client = cls.cmgr_adm.subnets_client
+        cls.sec_rule_client = cls.cmgr_adm.security_group_rules_client
+        cls.sec_client = cls.cmgr_adm.security_groups_client
 
     @classmethod
     def resource_setup(cls):
@@ -81,6 +86,49 @@ class TestNewCase(feature_manager.FeatureManager):
         topology_dict = dict(router_state=router_state,
                              network_state=network_state,
                              subnet_state=subnet_state)
+        return topology_dict
+
+    def create_topo_two_routers_two_networks(self,
+                                             create_instance=True,
+                                             set_gateway=True, **kwargs):
+        """
+        Create Topo where 2 logical switches which are
+        two routers are connected to two different sunets.
+        """
+        rtr_name = data_utils.rand_name(name='tempest-router')
+        rtr_name2 = data_utils.rand_name(name='tempest-router')
+        network_name1 = data_utils.rand_name(name='tempest-net')
+        network_name2 = data_utils.rand_name(name='tempest-net')
+        subnet_name1 = data_utils.rand_name(name='tempest-subnet')
+        subnet_name2 = data_utils.rand_name(name='tempest-subnet')
+        router_state = self.create_topology_router(rtr_name,
+                                                   set_gateway=set_gateway,
+                                                   **kwargs)
+        router_state2 = self.create_topology_router(rtr_name2,
+                                                    set_gateway=set_gateway,
+                                                    **kwargs)
+        network_state1 = self.create_topology_network(network_name1)
+        network_state2 = self.create_topology_network(network_name2)
+        subnet_state1 = self.create_topology_subnet(
+                                            subnet_name1,
+                                            network_state1,
+                                            router_id=router_state["id"])
+        subnet_state2 = self.create_topology_subnet(
+                                            subnet_name2,
+                                            network_state2,
+                                            router_id=router_state2["id"],
+                                            cidr=constants.CIDR)
+        if create_instance:
+            self.create_topology_instance(
+                "server1", [network_state1])
+            self.create_topology_instance(
+                "server2", [network_state2])
+        topology_dict = dict(router_state=router_state,
+                             router_state2=router_state2,
+                             network_state1=network_state1,
+                             network_state2=network_state2,
+                             subnet_state1=subnet_state1,
+                             subnet_state2=subnet_state2)
         return topology_dict
 
     def create_topo_across_networks(self, namestart, create_instance=True):
@@ -536,7 +584,6 @@ class TestNewCase(feature_manager.FeatureManager):
         firewall_info = self.show_fw_v1(firewall_1['id'])
         self.assertIn("ACTIVE", firewall_info['firewall']['status'])
 
-    @decorators.attr(type='nsxv')
     @decorators.idempotent_id('2226016a-91cc-8905-b217-12344caa24a1')
     def test_update_router_with_static_route_via_0_0_0_0(self):
         """
@@ -647,3 +694,138 @@ class TestNewCase(feature_manager.FeatureManager):
         # Update router from distributed to shared should be restricted
         self.assertRaises(exceptions.BadRequest, self.update_topology_router,
                           router_id, **kwargs)
+
+    @decorators.attr(type='nsxv')
+    @decorators.idempotent_id('2226016a-92cc-5098-b217-12344caa24a1')
+    def test_vm_traffic_provider_network_vlan(self):
+        """
+           Create VLAN provider network with dvs as physical network
+           create instances of ESX image and check traffic
+        """
+        router_name = data_utils.rand_name(name='tempest-router')
+        net_name = data_utils.rand_name(name='tempest-net')
+        vlanid = int(CONF.nsxv.provider_vlan_id)
+        router = self.create_topology_router(
+                                     router_name,
+                                     routers_client=self.routers_client)
+        body = {"provider:network_type": constants.VLAN_TYPE,
+                "admin_state_up": 'True', "provider:segmentation_id": vlanid}
+        network = self.create_topology_network(
+                                      net_name,
+                                      networks_client=self.networks_client,
+                                      **body)
+        subnet_name = network['name'] + 'sub'
+        self.create_topology_subnet(subnet_name, network,
+                                    routers_client=self.routers_client,
+                                    subnets_client=self.subnet_client,
+                                    router_id=router['id'])
+        kwargs = dict(tenant_id=network['tenant_id'],
+                      security_group_rules_client=self.sec_rule_client,
+                      security_groups_client=self.sec_client)
+        self.sg = self.create_topology_security_group(**kwargs)
+        vm1 = self.create_topology_instance(
+                  "server1", [network],
+                  security_groups=[{'name': self.sg['name']}],
+                  clients=self.cmgr_adm)
+        vm2 = self.create_topology_instance(
+                  "server2", [network],
+                  security_groups=[{'name': self.sg['name']}],
+                  clients=self.cmgr_adm)
+        ip_address = vm1['floating_ips'][0]['floating_ip_address']
+        ssh_source = self._get_remote_client(ip_address, use_password=True)
+        remote_ip = vm2.values()[1].values()[0][0]['addr']
+        # Verify connectivity between vms
+        self.check_remote_connectivity(ssh_source, remote_ip,
+                                       should_connect=True)
+
+    @decorators.attr(type='nsxv')
+    @decorators.idempotent_id('2226016a-93cc-5099-b217-12344caa24a1')
+    def test_vm_traffic_provider_network_vxlan(self):
+        """
+           Create a vxlan provider network and
+           verify default physical network is vdnscope,
+           create instances of ESX image and check traffic
+        """
+        router_name = data_utils.rand_name(name='tempest-rtr')
+        net_name = data_utils.rand_name(name='tempest-net')
+        router = self.create_topology_router(
+                                     router_name,
+                                     routers_client=self.routers_client)
+        body = {"provider:network_type": 'vxlan',
+                "admin_state_up": 'True'}
+        network = self.create_topology_network(
+                                       net_name,
+                                       networks_client=self.networks_client,
+                                       **body)
+        # Verify default physical network is vdnscope, not dvs
+        self.assertIn('vdnscope', network['provider:physical_network'])
+        subnet_name = network['name'] + 'sub'
+        self.create_topology_subnet(subnet_name, network,
+                                    routers_client=self.routers_client,
+                                    subnets_client=self.subnet_client,
+                                    router_id=router['id'])
+        kwargs = dict(tenant_id=network['tenant_id'],
+                      security_group_rules_client=self.sec_rule_client,
+                      security_groups_client=self.sec_client)
+        self.sg = self.create_topology_security_group(**kwargs)
+        vm1 = self.create_topology_instance(
+                  "server1", [network],
+                  security_groups=[{'name': self.sg['name']}],
+                  clients=self.cmgr_adm)
+        vm2 = self.create_topology_instance(
+                  "server2", [network],
+                  security_groups=[{'name': self.sg['name']}],
+                  clients=self.cmgr_adm)
+        ip_address = vm1['floating_ips'][0]['floating_ip_address']
+        ssh_source = self._get_remote_client(ip_address, use_password=True)
+        remote_ip = vm2.values()[1].values()[0][0]['addr']
+        # Verify Connectivity between vms
+        self.check_remote_connectivity(ssh_source, remote_ip,
+                                       should_connect=True)
+
+    @decorators.attr(type='nsxv')
+    @decorators.idempotent_id('2226016a-93cc-5099-b217-12344caa24a1')
+    def test_firewall_witout_policy_added_to_router_active(self):
+        """
+        create two routers and two subnets[each router connected to a
+        different subnet].
+        create two firewalls, one connected to each router,
+        remove firewall from one router and connect it to another router
+        the firewall should remain ACTIVE
+        """
+        kwargs = {"distributed": "true",
+                  "admin_state_up": "True"}
+        topology_dict = self.create_topo_two_routers_two_networks(
+                                                         create_instance=False,
+                                                         set_gateway=True,
+                                                         **kwargs)
+        router_id1 = topology_dict['router_state']['id']
+        router_id2 = topology_dict['router_state2']['id']
+        # Create Firewall1 and add it to the router1's interface
+        body = self.create_fw_v1_policy()
+        fw_policy_id = body['id']
+        firewall_1 = self.create_fw_v1(
+            firewall_policy_id=fw_policy_id,
+            router_ids=[router_id1])
+        time.sleep(constants.NSX_BACKEND_SMALL_TIME_INTERVAL)
+        firewall_info = self.show_fw_v1(firewall_1['id'])
+        self.assertIn("ACTIVE", firewall_info['firewall']['status'])
+        # Create Firewall2 and add it to the router2's interface
+        body2 = self.create_fw_v1_policy()
+        fw_policy_id2 = body2['id']
+        firewall_2 = self.create_fw_v1(
+            firewall_policy_id=fw_policy_id2,
+            router_ids=[router_id2])
+        time.sleep(constants.NSX_BACKEND_SMALL_TIME_INTERVAL)
+        firewall_info = self.show_fw_v1(firewall_2['id'])
+        self.assertIn("ACTIVE", firewall_info['firewall']['status'])
+        # Delete router1 from firewall1
+        kwargs = {"router_ids": []}
+        self.update_fw_v1(firewall_1['id'], **kwargs)
+        time.sleep(constants.NSX_BACKEND_TIME_INTERVAL)
+        # Add firewall2 to router1
+        kwargs = {"router_ids": [router_id1]}
+        self.update_fw_v1(firewall_2['id'], **kwargs)
+        time.sleep(constants.NSX_BACKEND_TIME_INTERVAL)
+        firewall_info = self.show_fw_v1(firewall_2['id'])
+        self.assertIn("ACTIVE", firewall_info['firewall']['status'])
