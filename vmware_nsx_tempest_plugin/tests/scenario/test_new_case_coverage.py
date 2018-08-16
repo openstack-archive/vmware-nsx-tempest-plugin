@@ -691,8 +691,7 @@ class TestNewCase(feature_manager.FeatureManager):
         self.assertRaises(exceptions.BadRequest, self.update_topology_router,
                           router_id, **kwargs)
 
-    @decorators.attr(type='nsxv')
-    @decorators.idempotent_id('2226016a-92cc-5098-b217-12344caa24a1')
+    @decorators.idempotent_id('2226016a-91cc-8905-b217-12344caa24a1')
     def test_vm_esx_traffic_provider_network_vlan(self):
         """
            Create VLAN provider network with dvs as physical network
@@ -738,8 +737,7 @@ class TestNewCase(feature_manager.FeatureManager):
         #Verify connectivity between vms
         self.check_remote_connectivity(ssh_source, remote_ip, should_connect)
 
-    @decorators.attr(type='nsxv')
-    @decorators.idempotent_id('2226016a-93cc-5099-b217-12344caa24a1')
+    @decorators.idempotent_id('2226016a-90dd-0987-b217-12344caa24a1')
     def test_vm_esx_traffic_provider_network_vxlan(self):
         """
            Create a vxlan provider network and verify default physical network is
@@ -788,7 +786,7 @@ class TestNewCase(feature_manager.FeatureManager):
         self.check_remote_connectivity(ssh_source, remote_ip, should_connect)
 
     @decorators.attr(type='nsxv')
-    @decorators.idempotent_id('2226016a-94cc-6000-217-12344caa24a1')
+    @decorators.idempotent_id('2226016a-91cc-8905-b217-12344caa24a1')
     def test_firewall_witout_policy_added_to_router_active(self):
         """
         create two routers and two subnets[each router connected to a different subnet]
