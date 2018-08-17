@@ -371,7 +371,10 @@ class TestZonesScenario(TestZonesV2Ops):
         if record is None:
             raise Exception('fip is missing in the recordset')
         my_resolver = dns.resolver.Resolver()
-        nameserver = CONF.dns.nameservers[0][:-3]
+        if type(CONF.dns.nameservers) is list:
+            nameserver = CONF.dns.nameservers[0][:-3]
+        else:
+            nameserver = CONF.dns.nameservers.split(":")[0]
         my_resolver.nameservers = [nameserver]
         #wait for status to change from pending to active
         time.sleep(const.ZONE_WAIT_TIME)
@@ -412,7 +415,10 @@ class TestZonesScenario(TestZonesV2Ops):
         if record is None:
             raise Exception('fip is missing in the recordset')
         my_resolver = dns.resolver.Resolver()
-        nameserver = CONF.dns.nameservers[0][:-3]
+        if type(CONF.dns.nameservers) is list:
+            nameserver = CONF.dns.nameservers[0][:-3]
+        else:
+            nameserver = CONF.dns.nameservers.split(":")[0]
         my_resolver.nameservers = [nameserver]
         #wait for status to change from pending to active
         time.sleep(const.ZONE_WAIT_TIME)
