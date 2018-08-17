@@ -257,8 +257,7 @@ class L2GatewayTest(L2GatewayBase):
         devices = {"devices": [
             {"device_name": device_name,
 
-             "interfaces": [{"name": "new_name",
-                             "segmentation_id": [self.VLAN_1]}],
+             "interfaces": [{"name": "new_name"}],
              "deleted_interfaces": [{"name": interface_name}]}
         ]}
         l2gw_id = rsp[constants.L2GW]["id"]
