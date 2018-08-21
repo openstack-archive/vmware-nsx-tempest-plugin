@@ -16,10 +16,13 @@ import re
 import testtools
 import time
 
+from oslo_log import log as logging
+
 from tempest import config
 from tempest.lib.common.utils import data_utils
 from tempest.lib import decorators
 from tempest.lib import exceptions
+from threading import Thread
 
 from vmware_nsx_tempest_plugin.common import constants
 from vmware_nsx_tempest_plugin.lib import feature_manager
@@ -27,6 +30,7 @@ from vmware_nsx_tempest_plugin.services import nsxv3_client
 from vmware_nsx_tempest_plugin.services import nsxv_client
 
 CONF = config.CONF
+LOG = logging.getLogger(__name__)
 
 
 class TestNewCase(feature_manager.FeatureManager):
@@ -647,3 +651,43 @@ class TestNewCase(feature_manager.FeatureManager):
         # Update router from distributed to shared should be restricted
         self.assertRaises(exceptions.BadRequest, self.update_topology_router,
                           router_id, **kwargs)
+
+    @decorators.idempotent_id('6075b85d-65fb-4c28-9637-36302efc9fbb')
+    def test_simultaneous_update_network(self):
+        """
+        Threading: Verify if network object can be 
+        updated simultaneously
+        """
+        network_name = data_utils.rand_name(name='tempest-net')
+        network = self.create_topology_network(network_name)
+        thread_list = []
+        for i in range(1, 5):
+            if i == 1:
+            	update_kwargs = {"admin_state_up": "True"}
+            if i == 2:
+                update_kwargs = {"description": "Tempest_Network"}
+            if i == 3:
+                update_kwargs = {"name": "Tempest_Updated_Network"}
+            if i == 4:
+                update_kwargs = {"port_security_enabled": "False"}
+            t = ThreadWithReturn(target=self.networks_client.update_network(network['id'], **update_kwargs))
+            thread_list.append(t)
+        #Start the threads
+        for thread in thread_list:
+            thread.daemon = True
+            thread.start()
+        for thread in thread_list:
+            thread.join()
+
+class ThreadWithReturn(Thread):
+    def __init__(self, group=None, target=None, name=None,
+                 args=(), kwargs={}, Verbose=None):
+        Thread.__init__(self, group, target, name, args, kwargs, Verbose)
+        self._return = None
+    def run(self):
+        if self._Thread__target is not None:
+            self._return = self._Thread__target(*self._Thread__args,
+                                                **self._Thread__kwargs)
+    def join(self):
+        Thread.join(self)
+        return self._return
