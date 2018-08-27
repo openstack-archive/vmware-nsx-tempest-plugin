@@ -759,7 +759,7 @@ class FWaaSTestJSON(base.BaseNetworkTest):
         # Create router required for an ACTIVE firewall
         firewall_topo = self._create_firewall_basic_topo('exclusive')
         # Try to create firewall with the same router
-        self.assertRaisesRegexp(
+        self.assertRaisesRegex(
             lib_exc.Conflict,
             "already associated with other Firewall",
             self.fwaasv1_client.create_firewall,
@@ -773,7 +773,7 @@ class FWaaSTestJSON(base.BaseNetworkTest):
         # Create router required for an ACTIVE firewall
         firewall_topo = self._create_firewall_basic_topo('distributed')
         # Try to create firewall with the same router
-        self.assertRaisesRegexp(
+        self.assertRaisesRegex(
             lib_exc.Conflict,
             "already associated with other Firewall",
             self.fwaasv1_client.create_firewall,
