@@ -134,12 +134,14 @@ class TestProviderSecurityGroup(manager.NetworkScenarioTest):
     def get_port_id(self, network_id, subnet_id, instance):
         _, instance_addr = instance["addresses"].items()[0]
         instance_fixed_ip = instance_addr[0]["addr"]
+        port_id = None
         for port in self._list_ports():
-            port_fixed_ip = port["fixed_ips"][0]["ip_address"]
-            if port["network_id"] == network_id and port["fixed_ips"][0][
+            if "fixed_ips" in port:
+                port_fixed_ip = port["fixed_ips"][0]["ip_address"]
+                if port["network_id"] == network_id and port["fixed_ips"][0][
                     "subnet_id"] == subnet_id and instance["id"] == port[
-                    "device_id"] and port_fixed_ip == instance_fixed_ip:
-                port_id = port["id"]
+                        "device_id"] and port_fixed_ip == instance_fixed_ip:
+                    port_id = port["id"]
         self.assertIsNotNone(port_id, "Failed to find Instance's port id!!!")
         return port_id
 

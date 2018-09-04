@@ -69,6 +69,7 @@ class BaseQosTest(base.BaseAdminNetworkTest):
         body = client_mgr.ports_client.create_port(
             network_id=network['id'], **kwargs)
         port = body.get('port', body)
+        cls.ports = []
         cls.ports.append(port)
         return port
 
@@ -424,15 +425,11 @@ class QosPolicyTest(BaseQosTest):
         network = self.create_shared_network('test network')
         self.addCleanup(test_utils.call_and_ignore_notfound_exc,
                         self.delete_network, network['id'])
-        port = self.create_port(network, qos_policy_id=policy['id'],
-                                client_mgr=self.primary_mgr)
-        self.addCleanup(test_utils.call_and_ignore_notfound_exc,
-                        self.delete_port, port['id'])
-        retrieved_port = self.show_port(port['id'],
-                                        client_mgr=self.primary_mgr)
-        # check if port is not attached to the policy
-        self.assertIsNone(retrieved_port['qos_policy_id'],
-                          'Error:Port is attached to qos policy')
+        self.assertRaises(
+            exceptions.NotFound,
+            self.create_port,
+            network,
+            qos_policy_id=policy['id'], client_mgr=self.primary_mgr)
 
     @decorators.attr(type='nsxv3')
     @decorators.idempotent_id('f8163237-fba9-4db5-9526-bad6d2343c76')
