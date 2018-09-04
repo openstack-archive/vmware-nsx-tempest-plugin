@@ -124,11 +124,12 @@ class TestNSXv3PortSecurityScenario(manager.NetworkScenarioTest):
         _, instance_addr = instance["addresses"].items()[0]
         instance_fixed_ip = instance_addr[0]["addr"]
         for port in self._list_ports():
-            port_fixed_ip = port["fixed_ips"][0]["ip_address"]
-            if port["network_id"] == network_id and port["fixed_ips"][0][
-                    "subnet_id"] == subnet_id and instance["id"] == port[
-                    "device_id"] and port_fixed_ip == instance_fixed_ip:
-                port_id = port["id"]
+            if len(port["fixed_ips"]) > 0:
+                port_fixed_ip = port["fixed_ips"][0]["ip_address"]
+                if port["network_id"] == network_id and port["fixed_ips"][0][
+                        "subnet_id"] == subnet_id and instance["id"] == port[
+                        "device_id"] and port_fixed_ip == instance_fixed_ip:
+                    port_id = port["id"]
         self.assertIsNotNone(port_id, "Failed to find Instance's port id!!!")
         return port_id
 

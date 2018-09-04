@@ -50,8 +50,9 @@ class NSXv3FloatingIPTest(base.BaseNetworkTest):
         cls.router = cls.create_router(data_utils.rand_name('router-'),
                                        external_network_id=cls.ext_net_id)
         cls.create_router_interface(cls.router['id'], cls.subnet['id'])
+        cls.ports = []
         for i in range(2):
-            cls.create_port(cls.network)
+            cls.ports.append(cls.create_port(cls.network))
         cls.nsx = nsxv3_client.NSXV3Client(CONF.nsxv3.nsx_manager,
                                            CONF.nsxv3.nsx_user,
                                            CONF.nsxv3.nsx_password)
