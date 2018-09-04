@@ -27,6 +27,7 @@ LOG = logging.getLogger(__name__)
 
 
 class TestMDProxy(feature_manager.FeatureManager):
+
     """Test MDProxy.
 
     Adding test cases to test MDProxy in different scenarios such as
@@ -100,48 +101,54 @@ class TestMDProxy(feature_manager.FeatureManager):
         md_counter = 0
         logical_ports = self.nsx.get_os_logical_ports()
         for port_index in range(len(logical_ports)):
-            if logical_ports[port_index]["attachment"][
-                    "attachment_type"] == "METADATA_PROXY":
-                if logical_ports[port_index]["tags"][0]["tag"] == network_id:
-                    msg = "MDproxy logical port does not have proper tenant " \
-                          "id!!!"
+            if "attachment" in logical_ports[port_index]:
+                if logical_ports[port_index]["attachment"][
+                        "attachment_type"] == "METADATA_PROXY":
+                    if logical_ports[port_index][
+                            "tags"][0]["tag"] == network_id:
+                        msg = "MDproxy logical port does not "\
+                              "have proper tenant "\
+                              "id!!!"
+                        self.assertEqual(
+                            tenant_id, logical_ports[port_index]["tags"][1][
+                                "tag"], msg)
+                        md_counter += 1
+                    msg1 = "Admin state of MDProxy logical port is DOWN!!!"
+                    msg2 = "LS name does not start with mdproxy!!!"
+                    msg3 = "MDproxy logical port does not have any auto tag!!!"
+                    msg4 = "MDproxy logical port does not have scope tag as " \
+                        "os-neutron-net-id!!!"
+                    msg5 = "MDproxy logical port does not have scope tag as " \
+                        "os-project-id!!!"
+                    msg6 = "MDproxy logical port does not have scope tag as " \
+                        "os-project-name!!!"
+                    msg7 = "MDproxy logical port does not have scope tag as " \
+                        "os-api-version!!!"
                     self.assertEqual(
-                        tenant_id, logical_ports[port_index]["tags"][1][
-                            "tag"], msg)
-                    md_counter += 1
-                msg1 = "Admin state of MDProxy logical port is DOWN!!!"
-                msg2 = "LS name does not start with mdproxy!!!"
-                msg3 = "MDproxy logical port does not have any auto tag!!!"
-                msg4 = "MDproxy logical port does not have scope tag as " \
-                       "os-neutron-net-id!!!"
-                msg5 = "MDproxy logical port does not have scope tag as " \
-                       "os-project-id!!!"
-                msg6 = "MDproxy logical port does not have scope tag as " \
-                       "os-project-name!!!"
-                msg7 = "MDproxy logical port does not have scope tag as " \
-                       "os-api-version!!!"
-                self.assertEqual(
-                    "UP", logical_ports[port_index]["admin_state"], msg1)
-                self.assertIn("mdproxy-",
-                              logical_ports[port_index]["display_name"], msg2)
-                self.assertNotEqual(0, len(logical_ports[port_index]["tags"]),
-                                    msg3)
-                self.assertEqual(
-                    "os-neutron-net-id",
-                    logical_ports[port_index]["tags"][0]["scope"],
-                    msg4)
-                self.assertEqual(
-                    "os-project-id",
-                    logical_ports[port_index]["tags"][1]["scope"],
-                    msg5)
-                self.assertEqual(
-                    "os-project-name",
-                    logical_ports[port_index]["tags"][2]["scope"],
-                    msg6)
-                self.assertEqual(
-                    "os-api-version",
-                    logical_ports[port_index]["tags"][3]["scope"],
-                    msg7)
+                        "UP", logical_ports[port_index]["admin_state"], msg1)
+                    self.assertIn("mdproxy-",
+                                  logical_ports[port_index]["display_name"],
+                                  msg2)
+                    self.assertNotEqual(
+                        0,
+                        len(logical_ports[port_index]["tags"]),
+                        msg3)
+                    self.assertEqual(
+                        "os-neutron-net-id",
+                        logical_ports[port_index]["tags"][0]["scope"],
+                        msg4)
+                    self.assertEqual(
+                        "os-project-id",
+                        logical_ports[port_index]["tags"][1]["scope"],
+                        msg5)
+                    self.assertEqual(
+                        "os-project-name",
+                        logical_ports[port_index]["tags"][2]["scope"],
+                        msg6)
+                    self.assertEqual(
+                        "os-api-version",
+                        logical_ports[port_index]["tags"][3]["scope"],
+                        msg7)
         self.assertNotEqual(0, md_counter, "No logical port found for MD "
                                            "proxy!!!")
 
