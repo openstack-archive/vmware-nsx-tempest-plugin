@@ -73,6 +73,7 @@ class RouterSizeBaseTest(base.BaseAdminNetworkTest):
                                CONF.nsxv.manager_uri).group(0)
         cls.vsm = nsxv_client.VSMClient(
             manager_ip, CONF.nsxv.user, CONF.nsxv.password)
+        cls.routers = []
 
     def setUp(self):
         super(RouterSizeBaseTest, self).setUp()
