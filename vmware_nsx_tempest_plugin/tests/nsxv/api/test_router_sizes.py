@@ -99,7 +99,6 @@ class RouterSizeBaseTest(base.BaseAdminNetworkTest):
             router_size=router_size)
         router = self.router_sizes_client.create_router(**rtr_cfg)
         router = router.get('router', router)
-        self.routers.append(router)
         self.assertEqual(router['name'], name)
         self.check_router_nsx_name(router, router_size)
         return router
