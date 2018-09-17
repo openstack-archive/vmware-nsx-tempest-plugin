@@ -167,13 +167,16 @@ class ApplianceManager(manager.NetworkScenarioTest):
 
     def create_topology_network(
             self, network_name, networks_client=None,
-            tenant_id=None, **kwargs):
+            tenant_id=None, net_name_enhance=True, **kwargs):
         if not networks_client:
             networks_client = self.networks_client
         if not tenant_id:
             tenant_id = networks_client.tenant_id
-        network_name_ = constants.APPLIANCE_NAME_STARTS_WITH + network_name
-        name = data_utils.rand_name(network_name_)
+        if net_name_enhance:
+            network_name_ = constants.APPLIANCE_NAME_STARTS_WITH + network_name
+            name = data_utils.rand_name(network_name_)
+        else:
+            name = network_name
         # Neutron disables port security by default so we have to check the
         # config before trying to create the network with port_security_enabled
         if CONF.network_feature_enabled.port_security:

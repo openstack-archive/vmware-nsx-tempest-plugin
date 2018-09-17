@@ -175,14 +175,17 @@ class NSXV3Client(object):
         results = []
         response = self.get(endpoint=endpoint)
         res_json = response.json()
-        cursor = res_json.get("cursor")
-        if res_json.get("results"):
-            results.extend(res_json["results"])
-        while cursor:
-            page = self.get(endpoint=endpoint, cursor=cursor).json()
-            results.extend(page.get("results", []))
-            cursor = page.get("cursor")
-        return results
+        if res_json.get("cursor"):
+            cursor = res_json.get("cursor")
+            if res_json.get("results"):
+                results.extend(res_json["results"])
+            while cursor:
+                page = self.get(endpoint=endpoint, cursor=cursor).json()
+                results.extend(page.get("results", []))
+                cursor = page.get("cursor")
+            return results
+        else:
+            return res_json
 
     def get_transport_zones(self):
         """
@@ -551,6 +554,13 @@ class NSXV3Client(object):
         """
         return self.get_logical_resources("/md-proxies")
 
+    def get_mdproxy_logical_switch_status(self, proxy_id, switch_id):
+        """
+        Get MDProxy info for logical switch
+        """
+        endpoint = "/md-proxies/%s/%s/status" % (proxy_id, switch_id)
+        return self.get_logical_resources(endpoint)
+
     def get_nsx_certificate(self):
         """
         Get all certificates registered with backend
@@ -582,13 +592,13 @@ class NSXV3Client(object):
         cert_response = self.get_nsx_certificate()
         i_err = "No certificates in the backend"
         k_err = "Argument does not exist in the certificate"
-        #check for empty certificates
+        # check for empty certificates
         try:
             cert_response['results'][0]
         except Exception:
             LOG.exception(i_err)
             raise
-        #check if openstack certificate is enabled
+        # check if openstack certificate is enabled
         for cert in cert_response['results']:
             try:
                 cert['used_by'][0]['service_types']
@@ -597,9 +607,9 @@ class NSXV3Client(object):
                 LOG.exception(k_err)
                 raise
             if (cert['used_by'][0]['service_types'][0] ==
-                'Client Authentication' and cert["_create_user"] == "admin"
-                and "'com.vmware.nsx.openstack'"
-                in cert['used_by'][0]['node_id']):
+                'Client Authentication' and cert["_create_user"] ==
+                "admin" and "'com.vmware.nsx.openstack'" in cert['used_by'][
+                    0]['node_id']):
                 LOG.info('Client certificate created')
                 return cert
         LOG.error("Client Certificate not created")
