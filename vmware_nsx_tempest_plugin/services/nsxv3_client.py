@@ -175,17 +175,14 @@ class NSXV3Client(object):
         results = []
         response = self.get(endpoint=endpoint)
         res_json = response.json()
-        if res_json.get("cursor"):
-            cursor = res_json.get("cursor")
-            if res_json.get("results"):
-                results.extend(res_json["results"])
-            while cursor:
-                page = self.get(endpoint=endpoint, cursor=cursor).json()
-                results.extend(page.get("results", []))
-                cursor = page.get("cursor")
-            return results
-        else:
-            return res_json
+        cursor = res_json.get("cursor")
+        if res_json.get("results"):
+            results.extend(res_json["results"])
+        while cursor:
+            page = self.get(endpoint=endpoint, cursor=cursor).json()
+            results.extend(page.get("results", []))
+            cursor = page.get("cursor")
+        return results
 
     def get_transport_zones(self):
         """
