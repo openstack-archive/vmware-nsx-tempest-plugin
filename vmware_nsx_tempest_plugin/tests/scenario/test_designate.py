@@ -25,7 +25,7 @@ from tempest.lib import exceptions as lib_exc
 from vmware_nsx_tempest_plugin.common import constants as const
 from vmware_nsx_tempest_plugin.lib import feature_manager
 from vmware_nsx_tempest_plugin.services import nsxv3_client
-
+from vmware_nsx_tempest_plugin.services import nsxv_client
 
 CONF = config.CONF
 
@@ -49,10 +49,17 @@ class TestZonesV2Ops(feature_manager.FeatureManager):
     @classmethod
     def resource_setup(cls):
         super(TestZonesV2Ops, cls).resource_setup()
-        cls.nsx = nsxv3_client.NSXV3Client(CONF.nsxv3.nsx_manager,
-                                           CONF.nsxv3.nsx_user,
-                                           CONF.nsxv3.nsx_password)
-        out = cls.nsx.get_transport_zones()
+        if CONF.network.backend == 'nsxv':
+            manager_ip = CONF.nsxv.manager_uri.split("/")[2]
+            cls.nsx = nsxv_client.VSMClient(manager_ip,
+                                            CONF.nsxv.user,
+                                            CONF.nsxv.password)
+            out = cls.nsx.get_all_vdn_scopes()
+        else:
+            cls.nsx = nsxv3_client.NSXV3Client(CONF.nsxv3.nsx_manager,
+                                               CONF.nsxv3.nsx_user,
+                                               CONF.nsxv3.nsx_password)
+            out = cls.nsx.get_transport_zones()
         vlan_flag = 0
         vxlan_flag = 0
         for tz in out:
@@ -376,7 +383,7 @@ class TestZonesScenario(TestZonesV2Ops):
         else:
             nameserver = CONF.dns.nameservers.split(":")[0]
         my_resolver.nameservers = [nameserver]
-        #wait for status to change from pending to active
+        # wait for status to change from pending to active
         time.sleep(const.ZONE_WAIT_TIME)
         try:
             answer = my_resolver.query(record['name'])
@@ -420,10 +427,10 @@ class TestZonesScenario(TestZonesV2Ops):
         else:
             nameserver = CONF.dns.nameservers.split(":")[0]
         my_resolver.nameservers = [nameserver]
-        #wait for status to change from pending to active
+        # wait for status to change from pending to active
         time.sleep(const.ZONE_WAIT_TIME)
         region = const.REGION_NAME
-        #check PTR record
+        # check PTR record
         ptr_record = self.show_ptr_record(region, fip_id)
         self.assertEqual(fip, ptr_record[1]['address'])
         try:
