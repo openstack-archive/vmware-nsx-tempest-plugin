@@ -490,3 +490,10 @@ class DesignatePtrClient(designate_base.DnsClientBase):
         Show FloatingIP PTR record
         """
         return self._show_request(self.path, ptr_id)
+
+    def set_fip_ptr_record(self, ptr_id, **ptrd):
+        """
+        Set FloatingIP PTR record
+        """
+        resp, body = self._update_request(self.path, ptr_id, ptrd)
+        return resp, body
