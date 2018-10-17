@@ -1002,6 +1002,19 @@ class FeatureManager(traffic_manager.IperfManager,
         self.assertGreater(len(body), 0)
         return body
 
+    def set_ptr_record(self, region, fip_id, ptrd_name):
+        """list ptr recordsets associated with floating ip.
+        :param fip_id: Unique FloatingIP ID.
+        """
+        ptr_id = region + ":" + fip_id
+        ptrd = {
+            "ptrdname": ptrd_name,
+            "description": "This is a floating ip PTR Domain Name",
+            "ttl": 600
+        }
+        _, body = self.ptr_client.set_fip_ptr_record(ptr_id, **ptrd)
+        return body
+
     def show_ptr_record(self, region, fip_id, user=None):
         """list ptr recordsets associated with floating ip.
         :param fip_id: Unique FloatingIP ID.

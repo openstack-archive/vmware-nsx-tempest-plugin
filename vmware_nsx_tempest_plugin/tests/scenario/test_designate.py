@@ -14,6 +14,8 @@
 #    under the License.
 import dns.resolver
 
+import subprocess
+
 import time
 
 from oslo_log import log as logging
@@ -396,52 +398,38 @@ class TestZonesScenario(TestZonesV2Ops):
                             'for the instance')
 
     @decorators.idempotent_id('2c3c0f63-c557-458f-a8f4-3b0e3065ed97')
-    def test_zone_reverse_nslookup_from_extvm(self):
+    def test_zone_reverse_dnslookup_from_extvm(self):
         """
-        Create a zone
-        Update network with zone
-        Boot an instance and associate fip
-        Perform nslookup for the dns name from ext vm
+        Create a floating ip
+        set a ptr record for the floating ip
+        Perform nslookup for the floating ip from ext vm
         """
-        image_id = self.get_glance_image_id(['cirros', 'esx'])
-        zone = self.create_zone()
-        network_designate = self.create_zone_topology(zone['name'])
-        self.assertEqual(network_designate['dns_domain'], zone['name'])
-        dns_vm = self.create_topology_instance(
-            "dns_vm", [network_designate],
-            security_groups=[{'name': self.designate_sg['name']}],
-            clients=self.os_adm,
-            create_floating_ip=True, image_id=image_id)
-        fip = dns_vm['floating_ips'][0]['floating_ip_address']
-        fip_id = dns_vm['floating_ips'][0]['id']
-        ptr_rev_name = '.'.join(reversed(fip.split("."))) + ".in-addr.arpa"
-        LOG.info('Show recordset of the zone')
-        recordset = self.list_record_set_zone(zone['id'])
-        self.verify_recordset(recordset, 3)
-        record = self.verify_recordset_floatingip(recordset, fip)
-        if record is None:
-            raise Exception('fip is missing in the recordset')
-        my_resolver = dns.resolver.Resolver()
+        fip = self.create_floatingip(client=self.os_admin.floating_ips_client)
+        ptr_rev_name = '.'.join(reversed(
+            fip['floating_ip_address'].split("."))) + ".in-addr.arpa."
+        if CONF.network.region != "":
+            region = CONF.network.region
+        else:
+            region = const.REGION_NAME
+        self.set_ptr_record(region, fip['id'], ptr_rev_name)
+        ptr_record = self.show_ptr_record(region, fip['id'])
+        self.assertEqual(fip['floating_ip_address'],
+            ptr_record[1]['address'])
         if type(CONF.dns.nameservers) is list:
             nameserver = CONF.dns.nameservers[0][:-3]
         else:
             nameserver = CONF.dns.nameservers.split(":")[0]
-        my_resolver.nameservers = [nameserver]
-        # wait for status to change from pending to active
-        time.sleep(const.ZONE_WAIT_TIME)
-        region = const.REGION_NAME
-        # check PTR record
-        ptr_record = self.show_ptr_record(region, fip_id)
-        self.assertEqual(fip, ptr_record[1]['address'])
+        nslookup_cmd = "nslookup %s %s" % (fip['floating_ip_address'],
+            nameserver)
         try:
-            answer = my_resolver.query(ptr_rev_name, "PTR")
+            output = subprocess.check_output(
+                nslookup_cmd, shell=True)
         except Exception:
-            LOG.error('ns lookup failed on ext-vm')
-        if (ptr_rev_name not in answer.response.to_text()
-           or record['name'] not in answer.response.to_text()):
-            LOG.error('failed to perform reverse dns for the instance')
+            LOG.error('Reverse dns lookup failed on ext-vm')
+        if ptr_rev_name not in output:
+            LOG.error('failed to perform reverse dns for the floating ip')
             raise Exception('Reverse DNS response does not have entry '
-                            'for the instance')
+                            'for the floating ip')
 
     @decorators.idempotent_id('6286cbd5-b0e4-4daa-9d8f-f27802c95925')
     def test_zone_deletion_post_fip_association(self):
