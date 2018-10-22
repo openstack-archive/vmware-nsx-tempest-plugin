@@ -12,7 +12,7 @@
 
 import time
 
-from tempest.lib.common.utils import misc as misc_utils
+from tempest.lib.common.utils import test_utils
 from tempest.lib import exceptions as lib_exc
 
 from tempest import exceptions
@@ -273,7 +273,7 @@ class LoadBalancerV1Client(base.BaseNetworkClient):
         message += ' failed to reach status %s' % status
         message += ' (current: %s)' % resource['status']
         message += ' within the required time %s' % timeout
-        caller = misc_utils.find_test_caller()
+        caller = test_utils.find_test_caller()
         if caller:
             message = '(%s) %s' % (caller, message)
         raise exceptions.TimeoutException(message)
