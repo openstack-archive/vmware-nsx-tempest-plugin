@@ -1,0 +1,11 @@
+Code-Review+1: 98k <18552437190@163.com>
+Code-Review+2: Adit Sarfaty <asarfaty@vmware.com>
+Code-Review+1: Vieri <15050873171@163.com>
+Code-Review+2: Kobi Samoray <ksamoray@vmware.com>
+Workflow+1: Kobi Samoray <ksamoray@vmware.com>
+Verified+2: Zuul
+Submitted-by: Zuul
+Submitted-at: Mon, 22 Oct 2018 13:53:11 +0000
+Reviewed-on: https://review.openstack.org/606744
+Project: openstack/vmware-nsx-tempest-plugin
+Branch: refs/heads/master
