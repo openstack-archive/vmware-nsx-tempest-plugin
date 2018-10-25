@@ -114,7 +114,7 @@ class VPNClient(base.BaseNetworkClient):
         vpn ike policy update request
         vpn ipsec policy create request
         vpn ipsec policy update request
-        vpn site conection create request
+        vpn site connection create request
         vpn site connection  update request
         l2 gateway connection list all request
     """
