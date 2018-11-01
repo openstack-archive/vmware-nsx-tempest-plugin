@@ -341,9 +341,28 @@ class FeatureManager(traffic_manager.IperfManager,
         # Wait for the firewall resource to become ready
         self._wait_fw_v1_until_ready(created_firewall['id'])
 
+    def ping_between_vms_different_router_uniscale(self, icmp_succeed=True):
+        """
+        Receives topology servers dictionary as input and finds all the
+        servers list checks NS and EW Traffic
+        """
+        for server in self.servers_details.values():
+            ip_address = server[0]['floating_ips'][0]['floating_ip_address']
+            ssh_source = self._get_remote_client(ip_address, use_password=True)
+            self.\
+                test_fip_check_server_and_project_network_connectivity(
+                    server,
+                    should_connect=icmp_succeed)
+            for remote_server in self.servers_details.values():
+                if remote_server[0]['name'] != server[0]['name']:
+                    remote_ip = remote_server[0][
+                        'addresses'].values()[0][0]['addr']
+                    self.check_remote_connectivity(ssh_source, remote_ip,
+                                                   should_succeed=True)
     #
     # L2Gateway base class. To get basics of L2GW.
     #
+
     def create_l2gw(self, l2gw_name, l2gw_param):
         """Creates L2GW and returns the response.
 

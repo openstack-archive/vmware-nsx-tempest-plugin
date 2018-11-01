@@ -66,13 +66,13 @@ class TestNetOps(feature_manager.FeatureManager):
         router_ops = self.create_topology_router("router_ops")
         network_ops = self.create_topology_network("network_ops")
         self.create_topology_subnet("subnet_ops", network_ops,
-            router_id=router_ops["id"])
+                                    router_id=router_ops["id"])
         self.create_topology_instance(
             "server_ops", [network_ops],
             security_groups=[{'name': self.net_ssh_icmp_sg['name']}])
 
     def verify_ping_to_fip_from_ext_vm(self, server_details):
-        self.using_floating_ip_check_server_and_project_network_connectivity(
+        self.test_fip_check_server_and_project_network_connectivity(
             server_details)
 
     def verify_ping_own_fip(self, server):
