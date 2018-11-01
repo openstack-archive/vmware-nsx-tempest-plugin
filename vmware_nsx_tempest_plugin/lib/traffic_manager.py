@@ -77,8 +77,9 @@ class TrafficManager(appliance_manager.ApplianceManager):
         self.check_server_internal_ips_using_floating_ip(
             floating_ip, server, compute_ips, should_connect)
 
-    def using_floating_ip_check_server_and_project_network_connectivity(
-            self, server_details, floating_ip=None, network=None):
+    def test_fip_check_server_and_project_network_connectivity(
+            self, server_details, floating_ip=None, network=None,
+            should_connect=True):
         if not network:
             network = server_details.networks[0]
         if not floating_ip:

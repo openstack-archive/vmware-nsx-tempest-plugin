@@ -163,7 +163,7 @@ class TestNewCase(feature_manager.FeatureManager):
         return topology_dict
 
     def verify_ping_to_fip_from_ext_vm(self, server_details):
-        self.using_floating_ip_check_server_and_project_network_connectivity(
+        self.test_fip_check_server_and_project_network_connectivity(
             server_details)
 
     def verify_ping_own_fip(self, server):

@@ -111,7 +111,7 @@ class TestMicroSegmentationOps(feature_manager.FeatureManager):
         # Web network
         network_web = self.create_topology_network("network_web")
         self.create_topology_subnet("subnet_web", network_web,
-                           router_id=router_microseg["id"])
+                                    router_id=router_microseg["id"])
         self.create_topology_instance(
             "server_web_1", [network_web],
             security_groups=[{'name': self.web_sg['name']}])
@@ -121,7 +121,7 @@ class TestMicroSegmentationOps(feature_manager.FeatureManager):
         # App network
         network_app = self.create_topology_network("network_app")
         self.create_topology_subnet("subnet_app", network_app,
-                           router_id=router_microseg["id"])
+                                    router_id=router_microseg["id"])
         self.create_topology_instance(
             "server_app_1", [network_app],
             security_groups=[{'name': self.app_sg['name']}])
@@ -130,7 +130,7 @@ class TestMicroSegmentationOps(feature_manager.FeatureManager):
             security_groups=[{'name': self.app_sg['name']}])
 
     def check_server_project_connectivity(self, server_details):
-        self.using_floating_ip_check_server_and_project_network_connectivity(
+        self.test_fip_check_server_and_project_network_connectivity(
             server_details)
 
     @decorators.attr(type=["nsxv3", "nsxv"])
