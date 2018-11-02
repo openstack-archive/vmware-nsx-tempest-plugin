@@ -205,15 +205,17 @@ class PortTypeTest(base.BaseAdminNetworkTest):
     def test_create_direct_port_w_flat_net_wout_port_settings_negative(self):
         """
         Create a flat network. Create a direct openstack port without required
-        port settings.
+        port settings.Enable security features while creating port.
         """
         test_flat_net = self._create_flat_network()
         test_port_name = data_utils.rand_name('test-port-')
         orig_post = {'name': test_port_name, 'binding:vnic_type': 'direct'}
         LOG.debug("create DIRECT port: %s", str(orig_post))
-        self.assertRaises(ex.BadRequest,
-                          self.create_port, network_id=test_flat_net['id'],
-                          **orig_post)
+        test_port = self.create_port(network_id=test_flat_net['id'],
+                                     **orig_post)
+        self.addCleanup(test_utils.call_and_ignore_notfound_exc,
+                        self.delete_port, test_port['port']['id'])
+        self.assertTrue(test_port)
 
     @decorators.attr(type='nsxv')
     @decorators.attr(type='negative')
