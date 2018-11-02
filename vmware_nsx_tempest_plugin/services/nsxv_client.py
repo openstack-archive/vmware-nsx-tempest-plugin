@@ -240,7 +240,7 @@ class VSMClient(object):
         Return firewall rules if found ,else return None.
         """
         self.__set_api_version('4.0')
-        self.__set_endpoint('/edges/%s/firewall/config ' % edge_Id)
+        self.__set_endpoint('/edges/%s/firewall/config' % edge_Id)
         response = self.get()
         rules = response.json()['firewallRules']['firewallRules']
         if len(rules) == 0:
