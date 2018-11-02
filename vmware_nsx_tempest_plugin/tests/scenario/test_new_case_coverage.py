@@ -15,14 +15,15 @@
 import re
 import testtools
 import time
-
 from tempest import config
 from tempest.lib.common.utils import data_utils
 from tempest.lib import decorators
 from tempest.lib import exceptions
+from tempest.lib.common.utils import test_utils
 
 from vmware_nsx_tempest_plugin.common import constants
 from vmware_nsx_tempest_plugin.lib import feature_manager
+from vmware_nsx_tempest_plugin.services import fwaas_client as FWAASC
 from vmware_nsx_tempest_plugin.services import nsxv3_client
 from vmware_nsx_tempest_plugin.services import nsxv_client
 
@@ -45,6 +46,7 @@ class TestNewCase(feature_manager.FeatureManager):
         cls.subnets_client = cls.cmgr_adm.subnets_client
         cls.sec_rule_client = cls.cmgr_adm.security_group_rules_client
         cls.sec_client = cls.cmgr_adm.security_groups_client
+        cls.fwaasv1_client = FWAASC.get_client(cls.cmgr_adm)
 
     @classmethod
     def resource_setup(cls):
@@ -163,7 +165,7 @@ class TestNewCase(feature_manager.FeatureManager):
         return topology_dict
 
     def verify_ping_to_fip_from_ext_vm(self, server_details):
-        self.test_fip_check_server_and_project_network_connectivity(
+        self.using_floating_ip_check_server_and_project_network_connectivity(
             server_details)
 
     def verify_ping_own_fip(self, server):
@@ -497,24 +499,28 @@ class TestNewCase(feature_manager.FeatureManager):
         kwargs = {"router_type": "shared",
                   "admin_state_up": "True"}
         router = self.create_topology_router("fire-1", **kwargs)
-        firewall = self.create_fw_v1_rule(action="allow",
-                                          protocol="icmp")
-        fw_rule_id1 = firewall['id']
+        firewall = self.fwaasv1_client.create_firewall_rule(action="allow",
+                                                            protocol="icmp")
+        fw_rule_id1 = firewall['firewall_rule']['id']
+        self.addCleanup(self._delete_rule_if_exists, fw_rule_id1)
         # Create firewall policy
-        body = self.create_fw_v1_policy()
-        fw_policy_id = body['id']
+        body = self.fwaasv1_client.create_firewall_policy()
+        fw_policy_id = body['firewall_policy']['id']
+        self.addCleanup(self._delete_policy_if_exists, fw_policy_id)
         # Insert rule to firewall policy
         self.insert_fw_v1_rule_in_policy(
             fw_policy_id, fw_rule_id1, '', '')
         # Create firewall should fail with shared router
-        firewall_1 = self.create_fw_v1(
+        firewall_1 = self.fwaasv1_client.create_firewall(
             firewall_policy_id=fw_policy_id,
             router_ids=[router['id']])
         time.sleep(constants.NSX_BACKEND_TIME_INTERVAL)
-        firewall_info = self.show_fw_v1(firewall_1['id'])
+        self.addCleanup(self._delete_firewall_if_exists,
+                        firewall_1['firewall']['id'])
+        firewall_info = self.show_fw_v1(firewall_1['firewall']['id'])
         self.assertIn("ERROR", firewall_info['firewall']['status'])
         kwargs = {"router_ids": []}
-        self.update_fw_v1(firewall_1['id'], **kwargs)
+        self.update_fw_v1(firewall_1['firewall']['id'], **kwargs)
         time.sleep(constants.NSX_BACKEND_TIME_INTERVAL)
 
     @decorators.attr(type='nsxv')
@@ -523,13 +529,14 @@ class TestNewCase(feature_manager.FeatureManager):
         """
         Firewall creation with md router should get fail
         """
-        firewall = self.create_fw_v1_rule(action="allow",
-                                          protocol="icmp")
-        fw_rule_id1 = firewall['id']
+        firewall = self.fwaasv1_client.create_firewall_rule(action="allow",
+                                                            protocol="icmp")
+        fw_rule_id1 = firewall['firewall_rule']['id']
         self.addCleanup(self._delete_rule_if_exists, fw_rule_id1)
         # Create firewall policy
-        body = self.create_fw_v1_policy()
-        fw_policy_id = body['id']
+        body = self.fwaasv1_client.create_firewall_policy()
+        fw_policy_id = body['firewall_policy']['id']
+        self.addCleanup(self._delete_policy_if_exists, fw_policy_id)
         # Insert rule to firewall policy
         self.insert_fw_v1_rule_in_policy(
             fw_policy_id, fw_rule_id1, '', '')
@@ -538,14 +545,16 @@ class TestNewCase(feature_manager.FeatureManager):
         router_id = [
             router for router in routers_list['routers']
             if "metadata_proxy_router" in router.get('name')][0]['id']
-        firewall_1 = self.create_fw_v1(
+        firewall_1 = self.fwaasv1_client.create_firewall(
             firewall_policy_id=fw_policy_id,
             router_ids=[router_id])
         time.sleep(constants.NSX_BACKEND_TIME_INTERVAL)
-        firewall_info = self.show_fw_v1(firewall_1['id'])
+        firewall_info = self.show_fw_v1(firewall_1['firewall']['id'])
+        self.addCleanup(self._delete_firewall_if_exists,
+                        firewall_1['firewall']['id'])
         self.assertIn("ERROR", firewall_info['firewall']['status'])
         kwargs = {"router_ids": []}
-        self.fwaasv1_client.update_fw_v1(firewall_1['id'], **kwargs)
+        self.update_fw_v1(firewall_1['firewall']['id'], **kwargs)
         time.sleep(constants.NSX_BACKEND_TIME_INTERVAL)
 
     @decorators.attr(type='nsxv')
@@ -554,34 +563,45 @@ class TestNewCase(feature_manager.FeatureManager):
         """
         Firewall update should work on exclusive router
         """
-        kwargs = {"router_type": "exclusive",
+        kwargs = {'name': 'fire-1',
+                  'external_gateway_info':
+                  {"network_id": CONF.network.public_network_id},
+                  "router_type": "exclusive",
                   "admin_state_up": "True"}
-        router = self.create_topology_router("fire-1", **kwargs)
-        firewall = self.create_fw_v1_rule(action="allow",
-                                          protocol="icmp")
-        fw_rule_id1 = firewall['id']
+        router = self.cmgr_adm.routers_client.create_router(**kwargs)
+        router = router['router'] if 'router' in router else router
+        self.addCleanup(test_utils.call_and_ignore_notfound_exc,
+                        self.routers_client.delete_router, router['id'])
+        firewall = self.fwaasv1_client.create_firewall_rule(action="allow",
+                                                            protocol="icmp")
+        fw_rule_id1 = firewall['firewall_rule']['id']
+        self.addCleanup(self._delete_rule_if_exists,
+                        fw_rule_id1)
         # Create firewall policy
-        body = self.create_fw_v1_policy()
-        fw_policy_id = body['id']
+        body = self.fwaasv1_client.create_firewall_policy()
+        fw_policy_id = body['firewall_policy']['id']
+        self.addCleanup(self._delete_policy_if_exists,
+                        fw_policy_id)
         # Insert rule to firewall policy
         self.insert_fw_v1_rule_in_policy(
             fw_policy_id, fw_rule_id1, '', '')
-        # Create firewall should fail with shared router
-        firewall_1 = self.create_fw_v1(
+        firewall_1 = self.fwaasv1_client.create_firewall(
             firewall_policy_id=fw_policy_id,
             router_ids=[router['id']])
         time.sleep(constants.NSX_BACKEND_SMALL_TIME_INTERVAL)
-        firewall_info = self.show_fw_v1(firewall_1['id'])
+        self.addCleanup(self._delete_firewall_if_exists,
+                        firewall_1['firewall']['id'])
+        firewall_info = self.show_fw_v1(firewall_1['firewall']['id'])
         self.assertIn("ACTIVE", firewall_info['firewall']['status'])
         kwargs = {"router_ids": []}
-        self.update_fw_v1(firewall_1['id'], **kwargs)
+        self.update_fw_v1(firewall_1['firewall']['id'], **kwargs)
         time.sleep(constants.NSX_BACKEND_SMALL_TIME_INTERVAL)
-        firewall_info = self.show_fw_v1(firewall_1['id'])
+        firewall_info = self.show_fw_v1(firewall_1['firewall']['id'])
         self.assertIn("INACTIVE", firewall_info['firewall']['status'])
         kwargs = {"router_ids": [router['id']]}
-        self.update_fw_v1(firewall_1['id'], **kwargs)
-        self._wait_fw_v1_until_ready(firewall_1['id'])
-        firewall_info = self.show_fw_v1(firewall_1['id'])
+        self.update_fw_v1(firewall_1['firewall']['id'], **kwargs)
+        self._wait_fw_v1_until_ready(firewall_1['firewall']['id'])
+        firewall_info = self.show_fw_v1(firewall_1['firewall']['id'])
         self.assertIn("ACTIVE", firewall_info['firewall']['status'])
 
     @decorators.idempotent_id('2226016a-91cc-8905-b217-12344caa24a1')
@@ -670,25 +690,29 @@ class TestNewCase(feature_manager.FeatureManager):
         """
         kwargs = {"router_type": "exclusive",
                   "admin_state_up": "True"}
-        name = "rtr-exc"
+        name = data_utils.rand_name(name='tempest-router')
         router_state = self.create_topology_router(name, set_gateway=True,
                                                    **kwargs)
         router_id = router_state['id']
-        firewall = self.create_fw_v1_rule(action="allow",
-                                          protocol="icmp")
-        fw_rule_id1 = firewall['id']
+        firewall = self.fwaasv1_client.create_firewall_rule(action="allow",
+                                                            protocol="icmp")
+        fw_rule_id1 = firewall['firewall_rule']['id']
+        self.addCleanup(self._delete_rule_if_exists, fw_rule_id1)
         # Create firewall policy
-        body = self.create_fw_v1_policy()
-        fw_policy_id = body['id']
+        body = self.fwaasv1_client.create_firewall_policy()
+        fw_policy_id = body['firewall_policy']['id']
+        self.addCleanup(self._delete_policy_if_exists, fw_policy_id)
         # Insert rule to firewall policy
         self.insert_fw_v1_rule_in_policy(
             fw_policy_id, fw_rule_id1, '', '')
         # Create firewall should fail with shared router
-        firewall_1 = self.create_fw_v1(
+        firewall_1 = self.fwaasv1_client.create_firewall(
             firewall_policy_id=fw_policy_id,
             router_ids=[router_id])
         time.sleep(constants.NSX_BACKEND_SMALL_TIME_INTERVAL)
-        firewall_info = self.show_fw_v1(firewall_1['id'])
+        self.addCleanup(self._delete_firewall_if_exists,
+                        firewall_1['firewall']['id'])
+        firewall_info = self.show_fw_v1(firewall_1['firewall']['id'])
         self.assertIn("ACTIVE", firewall_info['firewall']['status'])
         kwargs = {"router_type": "shared"}
         # Update router from distributed to shared should be restricted
@@ -717,7 +741,7 @@ class TestNewCase(feature_manager.FeatureManager):
         subnet_name = network['name'] + 'sub'
         self.create_topology_subnet(subnet_name, network,
                                     routers_client=self.routers_client,
-                                    subnets_client=self.subnet_client,
+                                    subnets_client=self.subnets_client,
                                     router_id=router['id'])
         kwargs = dict(tenant_id=network['tenant_id'],
                       security_group_rules_client=self.sec_rule_client,
@@ -736,7 +760,7 @@ class TestNewCase(feature_manager.FeatureManager):
         remote_ip = vm2.values()[1].values()[0][0]['addr']
         # Verify connectivity between vms
         self.check_remote_connectivity(ssh_source, remote_ip,
-                                       should_connect=True)
+                                       should_succeed=True)
 
     @decorators.attr(type='nsxv')
     @decorators.idempotent_id('2226016a-93cc-5099-b217-12344caa24a1')
@@ -762,7 +786,7 @@ class TestNewCase(feature_manager.FeatureManager):
         subnet_name = network['name'] + 'sub'
         self.create_topology_subnet(subnet_name, network,
                                     routers_client=self.routers_client,
-                                    subnets_client=self.subnet_client,
+                                    subnets_client=self.subnets_client,
                                     router_id=router['id'])
         kwargs = dict(tenant_id=network['tenant_id'],
                       security_group_rules_client=self.sec_rule_client,
@@ -781,7 +805,7 @@ class TestNewCase(feature_manager.FeatureManager):
         remote_ip = vm2.values()[1].values()[0][0]['addr']
         # Verify Connectivity between vms
         self.check_remote_connectivity(ssh_source, remote_ip,
-                                       should_connect=True)
+                                       should_succeed=True)
 
     @decorators.attr(type='nsxv')
     @decorators.idempotent_id('2226016a-93cc-5099-b217-12344caa24a1')
@@ -802,30 +826,39 @@ class TestNewCase(feature_manager.FeatureManager):
         router_id1 = topology_dict['router_state']['id']
         router_id2 = topology_dict['router_state2']['id']
         # Create Firewall1 and add it to the router1's interface
-        body = self.create_fw_v1_policy()
-        fw_policy_id = body['id']
-        firewall_1 = self.create_fw_v1(
+        body = self.fwaasv1_client.create_firewall_policy()
+        fw_policy_id = body['firewall_policy']['id']
+        self.addCleanup(self._delete_policy_if_exists,
+                        fw_policy_id)
+        firewall_1 = self.fwaasv1_client.create_firewall(
             firewall_policy_id=fw_policy_id,
             router_ids=[router_id1])
         time.sleep(constants.NSX_BACKEND_SMALL_TIME_INTERVAL)
-        firewall_info = self.show_fw_v1(firewall_1['id'])
+        firewall_id = firewall_1['firewall']['id']
+        self.addCleanup(self._delete_firewall_if_exists,
+                        firewall_id)
+        firewall_info = self.show_fw_v1(firewall_1['firewall']['id'])
         self.assertIn("ACTIVE", firewall_info['firewall']['status'])
         # Create Firewall2 and add it to the router2's interface
-        body2 = self.create_fw_v1_policy()
-        fw_policy_id2 = body2['id']
-        firewall_2 = self.create_fw_v1(
+        body2 = self.fwaasv1_client.create_firewall_policy()
+        fw_policy_id2 = body2['firewall_policy']['id']
+        self.addCleanup(self._delete_policy_if_exists,
+                        fw_policy_id2)
+        firewall_2 = self.fwaasv1_client.create_firewall(
             firewall_policy_id=fw_policy_id2,
             router_ids=[router_id2])
         time.sleep(constants.NSX_BACKEND_SMALL_TIME_INTERVAL)
-        firewall_info = self.show_fw_v1(firewall_2['id'])
+        self.addCleanup(self._delete_firewall_if_exists,
+                        firewall_2['firewall']['id'])
+        firewall_info = self.show_fw_v1(firewall_2['firewall']['id'])
         self.assertIn("ACTIVE", firewall_info['firewall']['status'])
         # Delete router1 from firewall1
         kwargs = {"router_ids": []}
-        self.update_fw_v1(firewall_1['id'], **kwargs)
+        self.update_fw_v1(firewall_1['firewall']['id'], **kwargs)
         time.sleep(constants.NSX_BACKEND_TIME_INTERVAL)
         # Add firewall2 to router1
         kwargs = {"router_ids": [router_id1]}
-        self.update_fw_v1(firewall_2['id'], **kwargs)
+        self.update_fw_v1(firewall_2['firewall']['id'], **kwargs)
         time.sleep(constants.NSX_BACKEND_TIME_INTERVAL)
-        firewall_info = self.show_fw_v1(firewall_2['id'])
+        firewall_info = self.show_fw_v1(firewall_2['firewall']['id'])
         self.assertIn("ACTIVE", firewall_info['firewall']['status'])

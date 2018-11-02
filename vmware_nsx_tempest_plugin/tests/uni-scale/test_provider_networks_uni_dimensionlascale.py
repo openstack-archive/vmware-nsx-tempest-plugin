@@ -34,7 +34,8 @@ class ProviderNetworkUnidimensionalScaleTest(feature_manager.FeatureManager):
     """Test Uni Dimesional Case for
        Provider vlan networks
        Provider vxlan networks
-       Boot vms from scale networks and check does vm booted properly
+       Boot vms from scale networks and check does vm booted propery
+       check connectivity between vms
     """
     @classmethod
     def setup_clients(cls):
