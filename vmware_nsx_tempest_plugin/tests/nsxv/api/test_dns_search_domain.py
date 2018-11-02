@@ -42,7 +42,7 @@ class DnsSearchDomainTest(base.BaseAdminNetworkTest):
 
     @classmethod
     def resource_cleanup(cls):
-        # we need to cleanup resouces created at class methods
+        # we need to cleanup resources created at class methods
         test_utils.call_and_ignore_notfound_exc(
             cls.networks_client.delete_network,
             cls.project_network['id'])
