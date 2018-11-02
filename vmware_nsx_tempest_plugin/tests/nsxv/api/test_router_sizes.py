@@ -163,6 +163,7 @@ class RouterSizeBaseTest(base.BaseAdminNetworkTest):
         router = self.create_exclusive_router(router_size)
         for new_router_size in new_router_size_list:
             self.change_router_size(router, new_router_size)
+        self.delete_router(router)
 
 
 class CompactRouterTest(RouterSizeBaseTest):
