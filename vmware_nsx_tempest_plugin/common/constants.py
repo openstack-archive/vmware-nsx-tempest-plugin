@@ -93,3 +93,12 @@ PEER_ADDRESS = "172.24.4.12"
 SITE_CONNECTION_STATE = 'True'
 PSK = "secret"
 CIDR = "22.0.9.0/24"
+#BARBICAN
+SECRET_TYPE = "opaque"
+ALGORITHM = "aes"
+PAYLOAD_CONTENT_TYPE = "text/plain"
+MODE = "cbc"
+BIT_LENGTH = 256
+CERT_FILE = "/root/server.crt"
+KEY_FILE = "/root/server.key"
+CONTAINER_TYPE = "certificate"
