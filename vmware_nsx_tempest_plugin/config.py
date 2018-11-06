@@ -210,3 +210,12 @@ DNSGroup = [
                default='',
                help="DNS Nameserver IP address"),
 ]
+
+barbican_group = cfg.OptGroup(name='barbican',
+                              title="barbican Configuration Options")
+
+BarbicanGroup = [
+    cfg.StrOpt('barbican_user_id',
+               default='',
+               help="barbican user id"),
+]
