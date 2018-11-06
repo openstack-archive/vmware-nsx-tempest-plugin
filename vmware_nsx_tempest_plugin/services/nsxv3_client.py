@@ -624,3 +624,11 @@ class NSXV3Client(object):
         """
         response = self.delete(endpoint=endpoint)
         return response.json()
+
+    def get_loadbalancers(self):
+        """
+        Get Loadbalancers
+
+        :return: returns list of md proxies information.
+        """
+        return self.get_logical_resources("/loadbalancer/services")
