@@ -13,6 +13,12 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
+import json
+import six
+
+from tempest.lib.common import rest_client
+from tempest.lib.common.utils import data_utils
+
 from oslo_log import log
 
 from tempest import config
@@ -497,3 +503,146 @@ class DesignatePtrClient(designate_base.DnsClientBase):
         """
         resp, body = self._update_request(self.path, ptr_id, ptrd)
         return resp, body
+
+
+class SecretClient(rest_client.RestClient):
+    def create_secret(self, **kwargs):
+        if 'name' not in kwargs:
+            kwargs['name'] = data_utils.rand_name("tempest-sec")
+
+        if 'payload' in kwargs and type(kwargs['payload']) is six.binary_type:
+            kwargs['payload'] = kwargs['payload'].decode('utf-8')
+
+        post_body = kwargs
+        body = json.dumps(post_body)
+        resp, body = self.post("v1/secrets", body)
+        self.expected_success(201, resp.status)
+        return self._parse_resp(body)
+
+    def delete_secret(self, secret_id):
+        resp, body = self.delete("v1/secrets/%s" % secret_id)
+        self.expected_success(204, resp.status)
+        return body
+
+    def list_secrets(self, **kwargs):
+        uri = "v1/secrets"
+        if kwargs is not None:
+            uri = '{base}?'.format(base=uri)
+
+            for key in kwargs.keys():
+                uri = '{base}&{name}={value}'.format(
+                    base=uri,
+                    name=key,
+                    value=kwargs[key]
+                )
+        resp, body = self.get(uri)
+        self.expected_success(200, resp.status)
+        return self._parse_resp(body)
+
+    def get_secret_metadata(self, secret_id):
+        resp, body = self.get("v1/secrets/%s" % secret_id)
+        self.expected_success(200, resp.status)
+        return self._parse_resp(body)
+
+    def get_secret_payload(self, secret_id):
+        content_headers = {
+            "Accept": "application/octet-stream"
+        }
+        resp, body = self.get("v1/secrets/%s/payload" % secret_id,
+                              headers=content_headers)
+        self.expected_success(200, resp.status)
+        return self._parse_resp(body)
+
+    def put_secret_payload(self, secret_id, payload):
+        content_headers = {
+            "Content-Type": "application/octet-stream",
+            "Content-Encoding": "base64"
+        }
+        resp, body = self.put("v1/secrets/%s" % secret_id,
+                              payload,
+                              headers=content_headers)
+        self.expected_success(204, resp.status)
+        return body
+
+    def add_acl_user_secret(self, secret_id, user_id):
+        kwargs =  {"read": 
+                   {"project-access": True, 
+                   "users": [user_id]
+                   }
+                  }
+        resp, body = self.put("v1/secrets/%s/acl" % secret_id,
+                              json.dumps(kwargs))
+        self.expected_success(200, resp.status)
+        return body
+
+
+class ContainerClient(rest_client.RestClient):
+
+    def list_containers(self, **kwargs):
+        uri = "v1/containers"
+        if kwargs:
+            uri += "?%s" % urllib.urlencode(kwargs)
+
+        response, body = self.get(uri)
+        self.expected_success(200, response.status)
+        return json.loads(body.decode("utf-8"))
+
+    def get_container(self, container_id):
+        uri = "v1/containers/%s" % container_id
+
+        response, body = self.get(uri)
+        self.expected_success(200, response.status)
+        return json.loads(body.decode("utf-8"))
+
+    def create_container(self, **kwargs):
+        uri = "v1/containers"
+
+        response, body = self.post(uri, json.dumps(kwargs))
+        self.expected_success(201, response.status)
+        return json.loads(body.decode("utf-8"))
+
+    def delete_container(self, container_id):
+        uri = "v1/containers/%s" % container_id
+
+        response, _ = self.delete(uri)
+        self.expected_success(204, response.status)
+        return
+
+    def add_secret_to_container(self, container_id, secret_id, **kwargs):
+        uri = "v1/containers/%s/secrets" % container_id
+        kwargs['secret_ref'] = "%s/v1/secrets/%s" % (
+            self.auth_provider.base_url({"service": "key-manager"}),
+            secret_id
+        )
+
+        response, body = self.post(
+            uri,
+            json.dumps(kwargs)
+        )
+        self.expected_success(201, response.status)
+        return json.loads(body.decode("utf-8"))
+
+    def delete_secret_from_container(self, container_id, secret_id, **kwargs):
+        uri = "v1/containers/%s/secrets" % container_id
+        kwargs['secret_ref'] = "%s/v1/secrets/%s" % (
+            self.auth_provider.base_url({"service": "key-manager"}),
+            secret_id
+        )
+
+        response, _ = self.delete(
+            uri,
+            body=json.dumps(kwargs)
+        )
+        self.expected_success(204, response.status)
+        return
+
+    def add_acl_user_containers(self, secret_id, user_id):
+        kwargs =  {"read":
+                   {"project-access": True,
+                   "users": [user_id]
+                   }
+                  }
+        resp, body = self.put("v1/containers/%s/acl" % secret_id,
+                              json.dumps(kwargs))
+        self.expected_success(200, resp.status)
+        return body
