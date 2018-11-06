@@ -624,3 +624,35 @@ class NSXV3Client(object):
         """
         response = self.delete(endpoint=endpoint)
         return response.json()
+
+    def get_loadbalancers(self):
+        """
+        Get Loadbalancers
+
+        :return: returns list of load balancers information.
+        """
+        return self.get_logical_resources("/loadbalancer/services")
+
+    def get_certificates(self):
+        """
+        Get Certificates
+
+        :return: returns list of certificates information.
+        """
+        return self.get_logical_resources("/trust-management/certificates")
+
+    def get_virtual_server(self):
+        """
+        Get virtual_server
+
+        :return: returns list of virtual servers information.
+        """
+        return self.get_logical_resources("/loadbalancer/virtual-servers")
+
+    def get_monitors(self):
+        """
+        Get health monitors
+
+        :return: returns list of health monitors information.
+        """
+        return self.get_logical_resources("/loadbalancer/monitors")

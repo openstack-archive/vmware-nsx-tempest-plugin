@@ -86,6 +86,13 @@ class FeatureManager(traffic_manager.IperfManager,
         cls.members_client = members_client.get_client(cls.os_primary)
         cls.health_monitors_client = \
             health_monitors_client.get_client(cls.os_primary)
+        cls.load_balancers_admin_client = \
+            load_balancers_client.get_client(cls.os_admin)
+        cls.listeners_admin_client = listeners_client.get_client(cls.os_admin)
+        cls.pools_admin_client = pools_client.get_client(cls.os_admin)
+        cls.members_admin_client = members_client.get_client(cls.os_admin)
+        cls.health_monitors_admin_client = \
+            health_monitors_client.get_client(cls.os_admin)
         cls.fwaas_v2_client = openstack_network_clients.FwaasV2Client(
             net_client.auth_provider,
             net_client.service,
@@ -125,6 +132,19 @@ class FeatureManager(traffic_manager.IperfManager,
             net_client.endpoint_type,
             **_params)
         cls.ptr_client = openstack_network_clients.DesignatePtrClient(
+            net_client.auth_provider,
+            net_client.service,
+            net_client.region,
+            net_client.endpoint_type,
+            **_params)
+        net_client.service = 'key-manager'
+        cls.secret_client = openstack_network_clients.SecretClient(
+            net_client.auth_provider,
+            net_client.service,
+            net_client.region,
+            net_client.endpoint_type,
+            **_params)
+        cls.container_client = openstack_network_clients.ContainerClient(
             net_client.auth_provider,
             net_client.service,
             net_client.region,
@@ -590,10 +610,15 @@ class FeatureManager(traffic_manager.IperfManager,
                 protocol_port=protocol_port)
             self.wait_for_load_balancer_status(lb_id)
 
-    def check_lbaas_project_weight_values(self, count=2):
+    def check_lbaas_project_weight_values(self, count=2, HTTPS=None,
+                                          member_count=None,
+                                          barbican_http=None):
         vip = self.vip_ip_address
         time.sleep(constants.SLEEP_BETWEEN_VIRTUAL_SEREVRS_OPEARTIONS)
-        self.do_http_request(vip=vip, send_counts=self.poke_counters)
+        if HTTPS is None:
+            self.do_http_request(vip=vip, send_counts=self.poke_counters)
+        else:
+            self.do_https_request(vip=vip, send_counts=self.poke_counters)
         # ROUND_ROUBIN, so equal counts
         if CONF.nsxv3.ens:
             vms = len(self.topology_servers.keys())
@@ -602,6 +627,21 @@ class FeatureManager(traffic_manager.IperfManager,
                                  "LB fails with weighted values")
             else:
                 pass
+        elif barbican_http:
+            no_of_vms = len(self.http_cnt)
+            if no_of_vms:
+                if (self.http_cnt['server_lbaas_2'] <
+                        (self.poke_counters / no_of_vms)):
+                    self.assertGreater(self.http_cnt['server_lbaas_3'],
+                                       self.poke_counters / no_of_vms)
+                elif (self.http_cnt['server_lbaas_3'] >
+                        (self.poke_counters / no_of_vms)):
+                    self.assertLess(self.http_cnt['server_lbaas_3'],
+                                    self.poke_counters / no_of_vms)
+                else:
+                    self.assertEqual(self.http_cnt['server_lbaas_3'],
+                                     self.poke_counters / no_of_vms,
+                                     "LB fails with weighted values")
         else:
             no_of_vms = len(self.http_cnt)
             if no_of_vms:
@@ -610,7 +650,7 @@ class FeatureManager(traffic_manager.IperfManager,
                     self.assertGreater(self.http_cnt['server_lbaas_1'],
                                        self.poke_counters / no_of_vms)
                 elif (self.http_cnt['server_lbaas_0'] >
-                      (self.poke_counters / no_of_vms)):
+                        (self.poke_counters / no_of_vms)):
                     self.assertLess(self.http_cnt['server_lbaas_1'],
                                     self.poke_counters / no_of_vms)
                 else:
@@ -618,7 +658,7 @@ class FeatureManager(traffic_manager.IperfManager,
                                      self.poke_counters / no_of_vms,
                                      "LB fails with weighted values")
 
-    def check_project_lbaas(self, count=2):
+    def check_project_lbaas(self, count=2, HTTPS=None):
         i = 0
         time.sleep(constants.SLEEP_BETWEEN_VIRTUAL_SEREVRS_OPEARTIONS)
         vip = self.vip_ip_address
@@ -655,74 +695,193 @@ class FeatureManager(traffic_manager.IperfManager,
         self.pools_client.update_pool(self.pool['id'],
                                       lb_algorithm=algo)
 
-    def create_project_lbaas(self, protocol_type, protocol_port, lb_algorithm,
-                             hm_type, member_count=2, max_vms=None,
-                             weight=None, fip_disassociate=None):
+    def create_project_lbaas(self, protocol_type,
+                             protocol_port, lb_algorithm,
+                             hm_type, member_count=2,
+                             max_vms=None, weight=None,
+                             fip_disassociate=None, barbican=False,
+                             pool_protocol=None, pool_port=None,
+                             vip_subnet_id=None, barbican_container=None,
+                             lb_id=None, count=None,
+                             clean_up=None):
         count = 0
-        vip_subnet_id = self.topology_subnets["subnet_lbaas_1"]['id']
-        lb_name = data_utils.rand_name(self.namestart)
-        self.loadbalancer = self.load_balancers_client.create_load_balancer(
-            name=lb_name, vip_subnet_id=vip_subnet_id)['loadbalancer']
-        lb_id = self.loadbalancer['id']
-        self.wait_for_load_balancer_status(lb_id)
+        lb_name = None
+        if vip_subnet_id is None:
+            vip_subnet_id = self.topology_subnets["subnet_lbaas_1"]['id']
+        if lb_id is None:
+            lb_name = data_utils.rand_name(self.namestart)
+            if barbican:
+                self.loadbalancer = self.\
+                    load_balancers_admin_client.\
+                    create_load_balancer(name=lb_name,
+                                         vip_subnet_id=vip_subnet_id
+                                         )['loadbalancer']
+                lb_id = self.loadbalancer['id']
+                self.addCleanup(
+                    self.load_balancers_admin_client.delete_load_balancer,
+                    self.loadbalancer['id'])
+                self.load_balancers_admin_client.wait_for_load_balancer_status(
+                    lb_id)
+            else:
+                self.loadbalancer = self.\
+                    load_balancers_client.\
+                    create_load_balancer(name=lb_name,
+                                         vip_subnet_id=vip_subnet_id
+                                         )['loadbalancer']
+                lb_id = self.loadbalancer['id']
+                self.wait_for_load_balancer_status(lb_id)
 
-        self.listener = self.listeners_client.create_listener(
-            loadbalancer_id=lb_id, protocol=protocol_type,
-            protocol_port=protocol_port, name=lb_name)['listener']
-        self.wait_for_load_balancer_status(lb_id)
-
-        self.pool = self.pools_client.create_pool(
-            listener_id=self.listener['id'],
-            lb_algorithm=lb_algorithm, protocol=protocol_type,
-            name=lb_name)['pool']
-        self.wait_for_load_balancer_status(lb_id)
+        if barbican:
+            listener_name = data_utils.rand_name("tempest_lb")
+            self.listener = self.listeners_admin_client.\
+                create_listener(loadbalancer_id=lb_id, protocol=protocol_type,
+                                protocol_port=protocol_port,
+                                name=listener_name,
+                                default_tls_container_ref=barbican_container
+                                ["container_ref"])['listener']
+            if clean_up is None:
+                self.addCleanup(
+                    self.listeners_admin_client.delete_listener,
+                    self.listener['id'])
+            self.load_balancers_admin_client.wait_for_load_balancer_status(
+                lb_id)
+        else:
+            self.listener = self.listeners_client.create_listener(
+                loadbalancer_id=lb_id, protocol=protocol_type,
+                protocol_port=protocol_port, name=lb_name)['listener']
+            self.wait_for_load_balancer_status(lb_id)
+        if barbican:
+            if lb_name is not None:
+                self.pool = self.pools_admin_client.create_pool(
+                    listener_id=self.listener['id'],
+                    lb_algorithm=lb_algorithm, protocol=pool_protocol,
+                    name=lb_name)['pool']
+            else:
+                self.pool = self.pools_admin_client.create_pool(
+                    listener_id=self.listener['id'],
+                    lb_algorithm=lb_algorithm, protocol=pool_protocol,
+                    name=lb_id)['pool']
+            self.load_balancers_admin_client.wait_for_load_balancer_status(
+                lb_id)
+            pool_id = self.pool['id']
+            if clean_up is None:
+                self.addCleanup(self.pools_admin_client.delete_pool, pool_id)
+                self.load_balancers_admin_client.wait_for_load_balancer_status(
+                    lb_id)
+        else:
+            self.pool = self.pools_client.create_pool(
+                listener_id=self.listener['id'],
+                lb_algorithm=lb_algorithm, protocol=protocol_type,
+                name=lb_name)['pool']
+            self.wait_for_load_balancer_status(lb_id)
         pool_id = self.pool['id']
 
-        self.healthmonitor = (
-            self.health_monitors_client.create_health_monitor(
-                pool_id=pool_id, type=hm_type,
-                delay=self.hm_delay, max_retries=self.hm_max_retries,
-                timeout=self.hm_timeout))
-        self.wait_for_load_balancer_status(lb_id)
+        if barbican:
+            self.healthmonitor = (
+                self.health_monitors_admin_client.create_health_monitor(
+                    pool_id=pool_id, type=hm_type,
+                    delay=self.hm_delay, max_retries=self.hm_max_retries,
+                    timeout=self.hm_timeout))['healthmonitor']
+            self.load_balancers_admin_client.wait_for_load_balancer_status(
+                lb_id)
+            if clean_up is None:
+                self.addCleanup(
+                    self.health_monitors_admin_client.delete_health_monitor,
+                    self.healthmonitor['id'])
+        else:
+            self.healthmonitor = (
+                self.health_monitors_client.create_health_monitor(
+                    pool_id=pool_id, type=hm_type,
+                    delay=self.hm_delay, max_retries=self.hm_max_retries,
+                    timeout=self.hm_timeout))
+            self.wait_for_load_balancer_status(lb_id)
         self.members = []
         for server_name in self.topology_servers.keys():
             if count < member_count:
                 fip_data = self.servers_details[server_name].floating_ips[0]
                 fixed_ip_address = fip_data['fixed_ip_address']
                 if fip_disassociate is None:
-                    self._disassociate_floating_ip(fip_data)
+                    if barbican:
+                        kwargs = dict(port_id=None)
+                        self.cmgr_adm.floating_ips_client.\
+                            update_floatingip(fip_data['id'],
+                                              **kwargs)['floatingip']
+                    else:
+                        self._disassociate_floating_ip(fip_data)
                 if weight:
                     weight += count
-                    member = self.members_client.create_member(
-                        pool_id, subnet_id=vip_subnet_id,
-                        address=fixed_ip_address,
-                        protocol_port=protocol_port,
-                        weight=weight)
+                    if barbican:
+                        member = self.members_admin_client.create_member(
+                            pool_id, subnet_id=vip_subnet_id,
+                            address=fixed_ip_address,
+                            protocol_port=pool_port,
+                            weight=weight)['member']
+                    else:
+                        member = self.members_client.create_member(
+                            pool_id, subnet_id=vip_subnet_id,
+                            address=fixed_ip_address,
+                            protocol_port=protocol_port,
+                            weight=weight)
                 else:
-                    member = self.members_client.create_member(
-                        pool_id, subnet_id=vip_subnet_id,
-                        address=fixed_ip_address,
-                        protocol_port=protocol_port)
-                self.wait_for_load_balancer_status(lb_id)
+                    if barbican:
+                        member = self.members_admin_client.create_member(
+                            pool_id, subnet_id=vip_subnet_id,
+                            address=fixed_ip_address,
+                            protocol_port=pool_port)['member']
+                    else:
+                        member = self.members_client.create_member(
+                            pool_id, subnet_id=vip_subnet_id,
+                            address=fixed_ip_address,
+                            protocol_port=protocol_port)
+                if barbican:
+                    self.load_balancers_admin_client.\
+                        wait_for_load_balancer_status(lb_id)
+                else:
+                    self.wait_for_load_balancer_status(lb_id)
+                if barbican:
+                    if clean_up is None:
+                        self.addCleanup(
+                            self.members_admin_client.delete_member,
+                            pool_id,
+                            member['id'])
                 self.members.append(member)
                 self.server_names.append(server_name)
                 count += 1
             else:
                 break
         if not CONF.nsxv3.ens:
-            self.ports_client.update_port(
+            self.cmgr_adm.ports_client.update_port(
                 self.loadbalancer['vip_port_id'],
                 security_groups=[self.sg['id']])
         # create lbaas public interface
-        vip_fip = \
-            self.create_floatingip(self.loadbalancer,
-                                   port_id=self.loadbalancer['vip_port_id'])
-        self.vip_ip_address = vip_fip['floating_ip_address']
-        pools = self.pools_client.show_pool(
-            self.pool['id'])
-        return dict(lb_id=lb_id, pool=pools,
-                    vip_port=self.loadbalancer['vip_port_id'],
-                    vip_ip=self.vip_ip_address)
+        if barbican:
+            if not hasattr(self, 'vip_ip_address'):
+                self.cmgr_adm.ports_client.update_port(
+                    self.loadbalancer['vip_port_id'],
+                    security_groups=[
+                        self.sg['id']])
+                vip_fip = self.create_floatingip(
+                    self.loadbalancer,
+                    client=self.cmgr_adm.floating_ips_client,
+                    port_id=self.loadbalancer['vip_port_id'])
+                self.vip_ip_address = vip_fip['floating_ip_address']
+            return dict(lb_id=lb_id,
+                        vip_address=self.vip_ip_address,
+                        pool_id=pool_id,
+                        healthmonitor_id=self.healthmonitor['id'],
+                        members=self.members,
+                        listener_id=self.listener['id'])
+        else:
+            vip_fip = \
+                self.create_floatingip(self.loadbalancer,
+                                       port_id=self.loadbalancer['vip_port_id']
+                                       )
+            self.vip_ip_address = vip_fip['floating_ip_address']
+            pools = self.pools_client.show_pool(
+                self.pool['id'])
+            return dict(lb_id=lb_id, pool=pools,
+                        vip_port=self.loadbalancer['vip_port_id'],
+                        vip_ip=self.vip_ip_address)
 
     def get_router_port(self, client):
         """List ports using admin creds """
@@ -1041,3 +1200,92 @@ class FeatureManager(traffic_manager.IperfManager,
         ptr_id = region + ":" + fip_id
         body = self.ptr_client.show_ptr_record(ptr_id)
         return body
+
+    def _get_uuid(self, href):
+        return href.split('/')[-1]
+
+    def create_barbican_secret(self, **kwargs):
+        """
+        Create barbican secret
+        """
+        result = self.secret_client.create_secret(**kwargs)
+        uuid = self._get_uuid(result['secret_ref'])
+        self.addCleanup(test_utils.call_and_ignore_notfound_exc,
+                        self.secret_client.delete_secret, uuid)
+        self.secret_client.add_acl_user_secret(
+            secret_id=uuid, user_id=CONF.barbican.barbican_user_id)
+        return result
+
+    def create_barbican_container(self, **kwargs):
+        """
+        Create barbican secret container
+        """
+        result = self.container_client.create_container(**kwargs)
+        uuid = self._get_uuid(result['container_ref'])
+        self.addCleanup(test_utils.call_and_ignore_notfound_exc,
+                        self.container_client.delete_container, uuid)
+        self.container_client.add_acl_user_containers(
+            secret_id=uuid, user_id=CONF.barbican.barbican_user_id)
+        return result
+
+    def create_barbican_secret_conatainer(self, cert_file, key_file):
+        """
+            Create barbican secrets with provided
+            cert file and key file.
+            Create barbican secret container with
+            created secrets and return secrets and container
+        """
+        cert_file = open(cert_file, "r")
+        cert_content = cert_file.read()
+        secret_name1 = data_utils.rand_name(name='tempest-cert-secret')
+        kwargs = {"secret_type": 'passphrase',
+                  "algorithm": constants.ALGORITHM,
+                  "payload_content_type": constants.PAYLOAD_CONTENT_TYPE,
+                  "mode": constants.MODE,
+                  "bit_length": constants.BIT_LENGTH,
+                  "payload": cert_content,
+                  "name": secret_name1}
+        barbican_secret1 = self.create_barbican_secret(**kwargs)
+        cert_file = open(key_file, "r")
+        cert_content = cert_file.read()
+        secret_name2 = data_utils.rand_name(name='tempest-key-secret')
+        kwargs = {"secret_type": 'passphrase',
+                  "algorithm": constants.ALGORITHM,
+                  "payload_content_type": constants.PAYLOAD_CONTENT_TYPE,
+                  "mode": constants.MODE,
+                  "bit_length": constants.BIT_LENGTH,
+                  "payload": cert_content,
+                  "name": secret_name2}
+        barbican_secret2 = self.create_barbican_secret(**kwargs)
+        container_name = data_utils.rand_name(name='tempest-container')
+        kwargs = {"type": constants.CONTAINER_TYPE,
+                  "name": container_name,
+                  "secret_refs": [{"secret_ref": barbican_secret1
+                                   ['secret_ref'],
+                                   "name": 'certificate'},
+                                  {"secret_ref": barbican_secret2
+                                   ['secret_ref'],
+                                   "name": 'private_key'}]}
+        barbican_container = self.create_barbican_container(**kwargs)
+        secret_container_dict = dict(secret_1=barbican_secret1,
+                                     secret_2=barbican_secret2,
+                                     secret_container=barbican_container)
+        return secret_container_dict
+
+    def check_certificate_at_backend(self, should_present=True,
+                                     cert_conent=None):
+        """
+        Check barbican certificate at backend
+        """
+        # check certificate at backend
+        time.sleep(constants.NSX_BACKEND_VERY_SMALL_TIME_INTERVAL)
+        # nsx api call to get certificates from backend
+        certs = self.nsx.get_certificates()
+        Present = "False"
+        for cert in certs:
+            if cert['pem_encoded'] == cert_conent:
+                Present = "True"
+        if should_present:
+            self.assertIn(Present, "True")
+        else:
+            self.assertIn(Present, "False")
