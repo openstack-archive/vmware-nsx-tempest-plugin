@@ -25,6 +25,7 @@ from vmware_nsx_tempest_plugin.common import constants
 from vmware_nsx_tempest_plugin.lib import feature_manager
 from vmware_nsx_tempest_plugin.services import nsxv3_client
 from vmware_nsx_tempest_plugin.services import nsxv_client
+from oslo_utils import uuidutils
 
 CONF = config.CONF
 
@@ -829,3 +830,509 @@ class TestNewCase(feature_manager.FeatureManager):
         time.sleep(constants.NSX_BACKEND_TIME_INTERVAL)
         firewall_info = self.show_fw_v1(firewall_2['id'])
         self.assertIn("ACTIVE", firewall_info['firewall']['status'])
+
+    def test_barbican_terminated_https_traffic(self):
+        barbican_secrets = self.create_barbican_secret_conatainer(
+            constants.CERT_FILE, constants.KEY_FILE)
+        barbican_container = barbican_secrets['secret_container']
+        topology_dict = self.create_topo_single_network(
+            "test_secret", create_instance=False)
+        network_state = topology_dict['network_state']
+        subnet_state = topology_dict['subnet_state']
+        sec_rule_client = self.sec_rule_client
+        sec_client = self.sec_client
+        kwargs = dict(tenant_id=network_state['tenant_id'],
+                      security_group_rules_client=sec_rule_client,
+                      security_groups_client=sec_client)
+        self.sg = self.create_topology_security_group(**kwargs)
+        lbaas_rules = [dict(direction='ingress', protocol='tcp',
+                            port_range_min=constants.HTTP_PORT,
+                            port_range_max=constants.HTTP_PORT, ),
+                       dict(direction='ingress', protocol='tcp',
+                            port_range_min=443, port_range_max=443, )]
+        for rule in lbaas_rules:
+            self.add_security_group_rule(
+                self.sg,
+                rule,
+                ruleclient=sec_rule_client,
+                secclient=sec_client,
+                tenant_id=network_state['tenant_id'])
+        no_of_servers = 2
+        image_id = self.get_glance_image_id(["cirros", "esx"])
+        for instance in range(0, no_of_servers):
+            self.create_topology_instance(
+                "server_lbaas_%s" % instance, [network_state],
+                security_groups=[{'name': self.sg['name']}],
+                image_id=image_id, clients=self.cmgr_adm)
+        self.poke_counters = 12
+        self.hm_delay = 4
+        self.hm_max_retries = 3
+        self.hm_timeout = 10
+        self.server_names = []
+        self.loadbalancer = None
+        self.vip_fip = None
+        self.web_service_start_delay = 2.5
+        self.start_web_servers(constants.HTTP_PORT)
+        self.create_barbican_project_lbaas(
+            protocol_type="TERMINATED_HTTPS",
+            protocol_port="443",
+            lb_algorithm="ROUND_ROBIN",
+            hm_type='HTTP',
+            member_count=2,
+            weight=5,
+            pool_protocol='HTTP',
+            pool_port='80',
+            vip_subnet_id=subnet_state['id'],
+            barbican_container=barbican_container,
+            count=0)
+        self.check_lbaas_project_weight_values(HTTPS=True)
+
+    def test_barbican_http_https_traffic(self):
+        barbican_secrets = self.create_barbican_secret_conatainer(
+            constants.CERT_FILE, constants.KEY_FILE)
+        barbican_container = barbican_secrets['secret_container']
+        topology_dict = self.create_topo_single_network(
+            "test_secret", create_instance=False)
+        network_state = topology_dict['network_state']
+        subnet_state = topology_dict['subnet_state']
+        sec_rule_client = self.sec_rule_client
+        sec_client = self.sec_client
+        kwargs = dict(tenant_id=network_state['tenant_id'],
+                      security_group_rules_client=sec_rule_client,
+                      security_groups_client=sec_client)
+        self.sg = self.create_topology_security_group(**kwargs)
+        lbaas_rules = [dict(direction='ingress', protocol='tcp',
+                            port_range_min=constants.HTTP_PORT,
+                            port_range_max=constants.HTTP_PORT, ),
+                       dict(direction='ingress', protocol='tcp',
+                            port_range_min=443, port_range_max=443, )]
+        for rule in lbaas_rules:
+            self.add_security_group_rule(
+                self.sg,
+                rule,
+                ruleclient=sec_rule_client,
+                secclient=sec_client,
+                tenant_id=network_state['tenant_id'])
+        no_of_servers = 2
+        image_id = self.get_glance_image_id(["cirros", "esx"])
+        for instance in range(0, no_of_servers):
+            self.create_topology_instance(
+                "server_lbaas_%s" % instance, [network_state],
+                security_groups=[{'name': self.sg['name']}],
+                image_id=image_id, clients=self.cmgr_adm)
+        self.start_web_servers(constants.HTTP_PORT)
+        self.poke_counters = 12
+        self.hm_delay = 4
+        self.hm_max_retries = 3
+        self.hm_timeout = 10
+        self.server_names = []
+        self.loadbalancer = None
+        self.vip_fip = None
+        self.web_service_start_delay = 2.5
+        topo_dict = self.create_barbican_project_lbaas(
+            protocol_type="TERMINATED_HTTPS",
+            protocol_port="443",
+            lb_algorithm="ROUND_ROBIN",
+            hm_type='HTTP',
+            member_count=2,
+            weight=5,
+            pool_protocol='HTTP',
+            pool_port='80',
+            vip_subnet_id=subnet_state['id'],
+            barbican_container=barbican_container,
+            count=0)
+        self.check_lbaas_project_weight_values(HTTPS=True)
+        no_of_servers = 4
+        self.topology_servers = {}
+        for instance in range(2, no_of_servers):
+            self.create_topology_instance(
+                "server_lbaas_%s" % instance, [network_state],
+                security_groups=[{'name': self.sg['name']}],
+                image_id=image_id, clients=self.cmgr_adm)
+        self.start_web_servers(constants.HTTP_PORT)
+        topo_dict = self.create_barbican_project_lbaas(
+            protocol_type="HTTP",
+            protocol_port="80",
+            lb_algorithm="ROUND_ROBIN",
+            hm_type='HTTP',
+            member_count=4,
+            weight=5,
+            pool_protocol='HTTP',
+            pool_port='80',
+            vip_subnet_id=subnet_state['id'],
+            barbican_container=barbican_container,
+            lb_id=topo_dict['lb_id'],
+            count=2)
+        self.check_lbaas_project_weight_values(barbican_http=True)
+
+    def test_barbican_multiple_listeners_with_secrets(self):
+        barbican_secrets = self.create_barbican_secret_conatainer(
+            constants.CERT_FILE, constants.KEY_FILE)
+        barbican_container = barbican_secrets['secret_container']
+        topology_dict = self.create_topo_single_network(
+            "test_secret", create_instance=False)
+        network_state = topology_dict['network_state']
+        subnet_state = topology_dict['subnet_state']
+        sec_rule_client = self.sec_rule_client
+        sec_client = self.sec_client
+        kwargs = dict(tenant_id=network_state['tenant_id'],
+                      security_group_rules_client=sec_rule_client,
+                      security_groups_client=sec_client)
+        self.sg = self.create_topology_security_group(**kwargs)
+        lbaas_rules = [dict(direction='ingress', protocol='tcp',
+                            port_range_min=constants.HTTP_PORT,
+                            port_range_max=constants.HTTP_PORT, ),
+                       dict(direction='ingress', protocol='tcp',
+                            port_range_min=443, port_range_max=443, )]
+        for rule in lbaas_rules:
+            self.add_security_group_rule(
+                self.sg,
+                rule,
+                ruleclient=sec_rule_client,
+                secclient=sec_client,
+                tenant_id=network_state['tenant_id'])
+        self.vip_ip_address = ''
+        self.namestart = 'lbaas-ops'
+        self.poke_counters = 12
+        self.hm_delay = 4
+        self.hm_max_retries = 3
+        self.hm_timeout = 10
+        self.server_names = []
+        self.loadbalancer = None
+        self.vip_fip = None
+        self.web_service_start_delay = 2.5
+        protocol_type = "TERMINATED_HTTPS"
+        protocol_port = 443
+        vip_subnet_id = subnet_state['id']
+        lb_name = data_utils.rand_name("tempest_lb")
+        self.loadbalancer = self.load_balancers_admin_client.\
+            create_load_balancer(
+                                 name=lb_name,
+                                 vip_subnet_id=vip_subnet_id
+                                )['loadbalancer']
+        lb_id = self.loadbalancer['id']
+        self.addCleanup(
+            self.load_balancers_admin_client.delete_load_balancer,
+            lb_id)
+        self.load_balancers_admin_client.wait_for_load_balancer_status(lb_id)
+        for i in range(1, 20):
+            listener_name = data_utils.rand_name("tempest_lb")
+            self.listener = self.listeners_admin_client.create_listener(
+                loadbalancer_id=lb_id,
+                protocol=protocol_type,
+                protocol_port=protocol_port,
+                name=listener_name,
+                default_tls_container_ref=barbican_container
+                ["container_ref"])['listener']
+            self.addCleanup(
+                self.listeners_admin_client.delete_listener,
+                self.listener['id'])
+            self.load_balancers_admin_client.wait_for_load_balancer_status(
+                lb_id)
+            protocol_port = protocol_port + 1
+
+    def test_barbican_create_listener_with_empty_secrets(self):
+        secret_name1 = data_utils.rand_name(name='tempest-cert-secret')
+        kwargs = {"secret_type": constants.SECRET_TYPE,
+                  "algorithm": constants.ALGORITHM,
+                  "name": secret_name1}
+        barbican_secret1 = self.create_barbican_secret(**kwargs)
+        secret_name2 = data_utils.rand_name(name='tempest-key-secret')
+        kwargs = {"secret_type": constants.SECRET_TYPE,
+                  "algorithm": constants.ALGORITHM,
+                  "name": secret_name2}
+        barbican_secret2 = self.create_barbican_secret(**kwargs)
+        container_name = data_utils.rand_name(name='tempest-container')
+        kwargs = {"type": constants.CONTAINER_TYPE,
+                  "name": container_name,
+                  "secret_refs": [{"secret_ref":
+                                   barbican_secret1['secret_ref'],
+                                   "name": 'certificate'},
+                                  {"secret_ref":
+                                   barbican_secret2['secret_ref'],
+                                   "name": 'private_key'}]}
+        barbican_container = self.create_barbican_container(**kwargs)
+        topology_dict = self.create_topo_single_network(
+            "test_secret", create_instance=False)
+        subnet_state = topology_dict['subnet_state']
+        self.vip_ip_address = ''
+        self.namestart = 'lbaas-ops'
+        self.poke_counters = 12
+        self.hm_delay = 4
+        self.hm_max_retries = 3
+        self.hm_timeout = 10
+        self.server_names = []
+        self.loadbalancer = None
+        self.vip_fip = None
+        self.web_service_start_delay = 2.5
+        protocol_type = "TERMINATED_HTTPS"
+        protocol_port = 443
+        vip_subnet_id = subnet_state['id']
+        lb_name = data_utils.rand_name("tempest_lb")
+        self.loadbalancer = self.load_balancers_admin_client.\
+            create_load_balancer(name=lb_name,
+                                 vip_subnet_id=vip_subnet_id)['loadbalancer']
+        lb_id = self.loadbalancer['id']
+        self.addCleanup(
+            self.load_balancers_admin_client.delete_load_balancer,
+            lb_id)
+        self.load_balancers_admin_client.wait_for_load_balancer_status(lb_id)
+        listener_name = data_utils.rand_name("tempest_lb")
+        self.assertRaises(
+            exceptions.ServerFault,
+            self.listeners_admin_client.create_listener,
+            loadbalancer_id=lb_id,
+            protocol=protocol_type,
+            protocol_port=protocol_port,
+            name=listener_name,
+            default_tls_container_ref=barbican_container["container_ref"])
+
+    def test_barbican_check_certificate_at_edge(self):
+        barbican_secrets = self.create_barbican_secret_conatainer(
+            constants.CERT_FILE, constants.KEY_FILE)
+        barbican_container = barbican_secrets['secret_container']
+        topology_dict = self.create_topo_single_network(
+            "test_secret", create_instance=False)
+        network_state = topology_dict['network_state']
+        subnet_state = topology_dict['subnet_state']
+        sec_rule_client = self.sec_rule_client
+        sec_client = self.sec_client
+        kwargs = dict(tenant_id=network_state['tenant_id'],
+                      security_group_rules_client=sec_rule_client,
+                      security_groups_client=sec_client)
+        self.sg = self.create_topology_security_group(**kwargs)
+        lbaas_rules = [dict(direction='ingress', protocol='tcp',
+                            port_range_min=constants.HTTP_PORT,
+                            port_range_max=constants.HTTP_PORT, ),
+                       dict(direction='ingress', protocol='tcp',
+                            port_range_min=443, port_range_max=443, )]
+        for rule in lbaas_rules:
+            self.add_security_group_rule(
+                self.sg,
+                rule,
+                ruleclient=sec_rule_client,
+                secclient=sec_client,
+                tenant_id=network_state['tenant_id'])
+        no_of_servers = 2
+        image_id = self.get_glance_image_id(["cirros", "esx"])
+        for instance in range(0, no_of_servers):
+            self.create_topology_instance(
+                "server_lbaas_%s" % instance, [network_state],
+                security_groups=[{'name': self.sg['name']}],
+                image_id=image_id, clients=self.cmgr_adm)
+        self.poke_counters = 12
+        self.hm_delay = 4
+        self.hm_max_retries = 3
+        self.hm_timeout = 10
+        self.server_names = []
+        self.loadbalancer = None
+        self.vip_fip = None
+        self.web_service_start_delay = 2.5
+        self.start_web_servers(constants.HTTP_PORT)
+        self.create_barbican_project_lbaas(
+            protocol_type="TERMINATED_HTTPS",
+            protocol_port="443",
+            lb_algorithm="ROUND_ROBIN",
+            hm_type='HTTP',
+            member_count=2,
+            weight=5,
+            pool_protocol='HTTP',
+            pool_port='80',
+            vip_subnet_id=subnet_state['id'],
+            barbican_container=barbican_container,
+            count=0)
+        self.check_certificate_at_edge()
+
+    def test_barbican_remove_listener_check_certificate_at_backend(self):
+        barbican_secrets = self.create_barbican_secret_conatainer(
+            constants.CERT_FILE, constants.KEY_FILE)
+        barbican_container = barbican_secrets['secret_container']
+        topology_dict = self.create_topo_single_network(
+            "test_secret", create_instance=False)
+        network_state = topology_dict['network_state']
+        subnet_state = topology_dict['subnet_state']
+        sec_rule_client = self.sec_rule_client
+        sec_client = self.sec_client
+        kwargs = dict(tenant_id=network_state['tenant_id'],
+                      security_group_rules_client=sec_rule_client,
+                      security_groups_client=sec_client)
+        self.sg = self.create_topology_security_group(**kwargs)
+        lbaas_rules = [dict(direction='ingress', protocol='tcp',
+                            port_range_min=constants.HTTP_PORT,
+                            port_range_max=constants.HTTP_PORT, ),
+                       dict(direction='ingress', protocol='tcp',
+                            port_range_min=443, port_range_max=443, )]
+        for rule in lbaas_rules:
+            self.add_security_group_rule(
+                self.sg,
+                rule,
+                ruleclient=sec_rule_client,
+                secclient=sec_client,
+                tenant_id=network_state['tenant_id'])
+        no_of_servers = 2
+        image_id = self.get_glance_image_id(["cirros", "esx"])
+        for instance in range(0, no_of_servers):
+            self.create_topology_instance(
+                "server_lbaas_%s" % instance, [network_state],
+                security_groups=[{'name': self.sg['name']}],
+                image_id=image_id, clients=self.cmgr_adm)
+        self.start_web_servers(constants.HTTP_PORT)
+        self.poke_counters = 12
+        self.hm_delay = 4
+        self.hm_max_retries = 3
+        self.hm_timeout = 10
+        self.server_names = []
+        self.loadbalancer = None
+        self.vip_fip = None
+        self.web_service_start_delay = 2.5
+        topo_dict = self.create_barbican_project_lbaas(
+            protocol_type="TERMINATED_HTTPS",
+            protocol_port="443",
+            lb_algorithm="ROUND_ROBIN",
+            hm_type='HTTP',
+            member_count=2,
+            weight=5,
+            pool_protocol='HTTP',
+            pool_port='80',
+            vip_subnet_id=subnet_state['id'],
+            barbican_container=barbican_container,
+            count=0,
+            clean_up=False)
+        self.check_certificate_at_edge()
+        no_of_servers = 4
+        self.topology_servers = {}
+        for instance in range(2, no_of_servers):
+            self.create_topology_instance(
+                "server_lbaas_%s" % instance, [network_state],
+                security_groups=[{'name': self.sg['name']}],
+                image_id=image_id, clients=self.cmgr_adm)
+        self.start_web_servers(constants.HTTP_PORT)
+        topo_dict_1 = self.create_barbican_project_lbaas(
+            protocol_type="TERMINATED_HTTPS",
+            protocol_port="444",
+            lb_algorithm="ROUND_ROBIN",
+            hm_type='HTTP',
+            member_count=4,
+            weight=5,
+            pool_protocol='HTTP',
+            pool_port='80',
+            vip_subnet_id=subnet_state['id'],
+            barbican_container=barbican_container,
+            lb_id=topo_dict['lb_id'],
+            count=2,
+            clean_up=False)
+        self.check_certificate_at_edge()
+        for member in topo_dict_1['members']:
+            self.members_admin_client.delete_member(
+                topo_dict_1['pool_id'], member['id'])
+            self.load_balancers_admin_client.wait_for_load_balancer_status(
+                topo_dict['lb_id'])
+        self.health_monitors_admin_client.delete_health_monitor(
+            topo_dict_1['healthmonitor_id'])
+        self.load_balancers_admin_client.wait_for_load_balancer_status(
+            topo_dict['lb_id'])
+        self.pools_admin_client.delete_pool(topo_dict_1['pool_id'])
+        self.load_balancers_admin_client.wait_for_load_balancer_status(
+            topo_dict['lb_id'])
+        self.listeners_admin_client.delete_listener(topo_dict_1['listener_id'])
+        self.load_balancers_admin_client.wait_for_load_balancer_status(
+            topo_dict['lb_id'])
+        self.check_certificate_at_edge()
+        for member in topo_dict['members']:
+            self.members_admin_client.delete_member(
+                topo_dict['pool_id'], member['id'])
+            self.load_balancers_admin_client.wait_for_load_balancer_status(
+                topo_dict['lb_id'])
+        self.health_monitors_admin_client.delete_health_monitor(
+            topo_dict['healthmonitor_id'])
+        self.load_balancers_admin_client.wait_for_load_balancer_status(
+            topo_dict['lb_id'])
+        self.pools_admin_client.delete_pool(topo_dict['pool_id'])
+        self.load_balancers_admin_client.wait_for_load_balancer_status(
+            topo_dict['lb_id'])
+        self.listeners_admin_client.delete_listener(topo_dict['listener_id'])
+        self.load_balancers_admin_client.wait_for_load_balancer_status(
+            topo_dict['lb_id'])
+        self.check_certificate_at_edge(should_present=False)
+
+    def test_barbican_multiple_secret_and_container(self):
+        for i in range(1, 51):
+            self.create_barbican_secret_conatainer(
+                constants.CERT_FILE, constants.KEY_FILE)
+
+    def test_barbican_secret_update(self):
+        cert_file = open(constants.CERT_FILE, "r")
+        cert_content = cert_file.read()
+        secret_name1 = data_utils.rand_name(name='tempest-cert-secret')
+        kwargs = {"secret_type": constants.SECRET_TYPE,
+                  "name": secret_name1}
+        barbican_secret1 = self.create_barbican_secret(**kwargs)
+        uuid = self._get_uuid(barbican_secret1['secret_ref'])
+        self.secret_client.put_secret_payload(uuid, cert_content)
+
+    def test_barbican_secret_create_with_octet_stream(self):
+        cert_file = open(constants.CERT_FILE, "r")
+        cert_content = cert_file.read()
+        secret_name1 = data_utils.rand_name(name='tempest-cert-secret')
+        kwargs = {"secret_type": constants.SECRET_TYPE,
+                  "algorithm": "binary",
+                  "payload_content_type": "application/octet-stream",
+                  "mode": constants.MODE,
+                  "bit_length": constants.BIT_LENGTH,
+                  "payload": cert_content,
+                  "name": secret_name1}
+        self.create_barbican_secret(**kwargs)
+
+    def test_barbican_delete_secret_container_with_invalid_uuid(self):
+        secert_id = uuidutils.generate_uuid()
+        self.assertRaises(exceptions.NotFound,
+                          self.secret_client.delete_secret,
+                          secert_id)
+        container_id = uuidutils.generate_uuid()
+        self.assertRaises(exceptions.NotFound,
+                          self.container_client.delete_container,
+                          container_id)
+
+    def test_barbican_create_lbaas_listener_with_invalid_container_uuid(self):
+        barbican_secrets = self.create_barbican_secret_conatainer(
+            constants.CERT_FILE, constants.KEY_FILE)
+        container_ref = barbican_secrets["secret_container"]['container_ref']\
+            .split('/')
+        container_ref.remove(container_ref[len(container_ref) - 1])
+        container_ref.append(uuidutils.generate_uuid())
+        container_ref = '/'.join(str(e) for e in container_ref)
+        topology_dict = self.create_topo_single_network(
+            "test_secret", create_instance=False)
+        subnet_state = topology_dict['subnet_state']
+        lb_name = data_utils.rand_name("tempest_lb")
+        self.loadbalancer = self.load_balancers_admin_client.\
+            create_load_balancer(name=lb_name,
+                                 vip_subnet_id=subnet_state
+                                 ['id'])['loadbalancer']
+        lb_id = self.loadbalancer['id']
+        self.addCleanup(
+            self.load_balancers_admin_client.delete_load_balancer,
+            self.loadbalancer['id'])
+        self.load_balancers_admin_client.wait_for_load_balancer_status(
+            lb_id)
+        listener_name = data_utils.rand_name("tempest_lb")
+        self.assertRaises(exceptions.NotFound,
+                          self.listeners_admin_client.create_listener,
+                          loadbalancer_id=lb_id, protocol="TERMINATED_HTTPS",
+                          protocol_port="443", name=listener_name,
+                          default_tls_container_ref=container_ref)
+
+    def test_barbican_secret_create_with_wrong_bit_length(self):
+        cert_file = open(constants.CERT_FILE, "r")
+        cert_content = cert_file.read()
+        secret_name1 = data_utils.rand_name(name='tempest-cert-secret')
+        kwargs = {"secret_type": constants.SECRET_TYPE,
+                  "algorithm": constants.ALGORITHM,
+                  "payload_content_type": constants.PAYLOAD_CONTENT_TYPE,
+                  "mode": constants.MODE,
+                  "bit_length": 6382372,
+                  "payload": cert_content,
+                  "name": secret_name1}
+        self.assertRaises(exceptions.BadRequest,
+                          self.create_barbican_secret, **kwargs
+                          )

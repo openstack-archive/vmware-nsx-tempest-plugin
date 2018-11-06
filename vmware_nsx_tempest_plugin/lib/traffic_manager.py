@@ -176,9 +176,12 @@ class TrafficManager(appliance_manager.ApplianceManager):
                                                   stderr)
         return stdout
 
-    def query_webserver(self, web_ip):
+    def query_webserver(self, web_ip, HTTPS=None):
         try:
-            url_path = "http://{0}/".format(web_ip)
+            if HTTPS is None:
+                url_path = "http://{0}/".format(web_ip)
+            else:
+                url_path = "https://{0}/".format(web_ip)
             # lbaas servers use nc, might be slower to response
             http = urllib3.PoolManager(retries=10)
             resp = http.request('GET', url_path)
@@ -205,6 +208,20 @@ class TrafficManager(appliance_manager.ApplianceManager):
                 self.http_cnt = self.query_ens(vip)
         # count_response counts the no of requests made for each members
         return self.http_cnt
+
+    def do_https_request(self, vip, start_path='', send_counts=None):
+        # http_cnt stores no of requests made for each members
+        self.http_cnt = {}
+        if not CONF.nsxv3.ens:
+            for x in range(send_counts):
+                resp = self.query_webserver(vip, HTTPS=True)
+                self.count_response(resp)
+        else:
+            for x in range(send_counts):
+                self.http_cnt = self.query_ens(vip, HTTPS=True)
+        # count_response counts the no of requests made for each members
+        return self.http_cnt
+
 
     def start_web_server(self, protocol_port, server, server_name=None):
         """start server's web service which return its server_name."""
