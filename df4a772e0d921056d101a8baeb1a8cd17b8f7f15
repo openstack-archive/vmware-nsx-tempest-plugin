@@ -1,0 +1,8 @@
+Code-Review+2: Deepthi Kandavara Jayarama <dkandavarajay@vmware.com>
+Workflow+1: Deepthi Kandavara Jayarama <dkandavarajay@vmware.com>
+Verified+2: Zuul
+Submitted-by: Zuul
+Submitted-at: Fri, 07 Dec 2018 00:57:38 +0000
+Reviewed-on: https://review.openstack.org/615195
+Project: openstack/vmware-nsx-tempest-plugin
+Branch: refs/heads/master
