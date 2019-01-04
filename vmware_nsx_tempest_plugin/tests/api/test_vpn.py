@@ -590,7 +590,7 @@ class TestVpnOps(feature_manager.FeatureManager):
             pass
 
     @decorators.idempotent_id('f4bea30b-76df-4dc2-a624-20621b8e0ef7')
-    def test_vpn_site_conenction_update_ops(self):
+    def test_vpn_site_connection_update_ops(self):
         network_topo = self.create_network_topo(cidr="34.0.0.0/24")
         vpn_topo = self.create_vpn_basic_topo(network_topo)
         site = vpn_topo['endpoint']
@@ -625,7 +625,7 @@ class TestVpnOps(feature_manager.FeatureManager):
                 'description'])
 
     @decorators.idempotent_id('8fbf9280-d154-425f-ad26-0a1250e0dd91')
-    def test_vpn_site_conenction_wrong_dpd_info(self):
+    def test_vpn_site_connection_wrong_dpd_info(self):
         network_topo = self.create_network_topo(cidr="35.0.0.0/24")
         vpn_topo = self.create_vpn_basic_topo(network_topo)
         site = vpn_topo['endpoint']
