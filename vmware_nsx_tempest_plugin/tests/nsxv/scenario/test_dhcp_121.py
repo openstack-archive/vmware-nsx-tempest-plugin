@@ -46,7 +46,7 @@ class TestDHCP121BasicOps(dmgr.TopoDeployScenarioManager):
 
     1) Creates an instance
     2) Ssh to instance and then check below information:
-       a) check metadata routes avialable or not
+       a) check metadata routes available or not
        b) check host routes avialble or not
        c) clear host-routes from subnet and check routes present on vm or not
        d) update subnet to disbale dhcp and check metadata routes not visible
