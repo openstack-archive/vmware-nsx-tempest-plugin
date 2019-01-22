@@ -214,7 +214,7 @@ class LBaasWithStaticRouteOnDhcpServerTest(feature_manager.FeatureManager):
         cmd = ('/sbin/route -n')
         out_data = client.exec_command(cmd)
         self.assertIsNotNone(out_data)
-        # Check Host routes on VM shouldn't be avialable
+        # Check Host routes on VM shouldn't be available
         self.assertNotIn(
             _subnet_data['new_host_routes'][0]['destination'], out_data)
         # Check Host-routes at beckend after deletion
