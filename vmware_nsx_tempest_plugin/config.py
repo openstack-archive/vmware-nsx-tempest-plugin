@@ -211,11 +211,10 @@ DNSGroup = [
                help="DNS Nameserver IP address"),
 ]
 
-barbican_group = cfg.OptGroup(name='barbican',
-                              title="barbican Configuration Options")
-
-BarbicanGroup = [
-    cfg.StrOpt('barbican_user_id',
-               default='',
-               help="barbican user id"),
+nsx_plugin_group = cfg.OptGroup(name='plugin',
+                         title="neutron nsx-plugin options")
+NSX_PluginGroup = [
+    cfg.BoolOpt('nsxp',
+               default=False,
+               help="neutron nsx-plugin type"),
 ]

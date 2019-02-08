@@ -26,6 +26,7 @@ from tempest import test
 
 from vmware_nsx_tempest_plugin.common import constants
 from vmware_nsx_tempest_plugin.services import nsxv3_client
+from vmware_nsx_tempest_plugin.services import nsxp_client
 
 LOG = logging.getLogger(__name__)
 
@@ -46,6 +47,9 @@ class NSXv3SecGroupTest(base.BaseSecGroupTest):
     def resource_setup(cls):
         super(NSXv3SecGroupTest, cls).resource_setup()
         cls.nsx = nsxv3_client.NSXV3Client(CONF.nsxv3.nsx_manager,
+                                           CONF.nsxv3.nsx_user,
+                                           CONF.nsxv3.nsx_password)
+        cls.nsxp = nsxp_client.NSXPClient(CONF.nsxv3.nsx_manager,
                                            CONF.nsxv3.nsx_user,
                                            CONF.nsxv3.nsx_password)
 
@@ -84,7 +88,7 @@ class NSXv3SecGroupTest(base.BaseSecGroupTest):
                              "rule does not match with %s." %
                              (key, value))
 
-    def _wait_till_firewall_gets_realize(self, secgroup, dfw_error_msg=""):
+    def _wait_till_firewall_gets_realize(self, secgroup, dfw_error_msg="", tenant_id=None):
         nsx_firewall_time_counter = 0
         nsx_dfw_section = None
         # wait till timeout or till dfw section
@@ -92,9 +96,17 @@ class NSXv3SecGroupTest(base.BaseSecGroupTest):
                 constants.NSX_FIREWALL_REALIZED_TIMEOUT and \
                 not nsx_dfw_section:
             nsx_firewall_time_counter += 1
-            nsx_nsgroup = self.nsx.get_ns_group(secgroup['name'],
+            if CONF.plugin.nsxp:
+                nsx_nsgroup = self.nsxp.get_ns_group(secgroup['name'],
+                                                secgroup['id'],os_tenant_id=tenant_id)
+            else:
+                nsx_nsgroup = self.nsx.get_ns_group(secgroup['name'],
                                                 secgroup['id'])
-            nsx_dfw_section = self.nsx.get_firewall_section(secgroup['name'],
+            if CONF.plugin.nsxp:
+                nsx_dfw_section = self.nsxp.get_firewall_section(secgroup['name'],
+                                                            secgroup['id'],os_tenant_id=tenant_id)
+            else:
+                nsx_dfw_section = self.nsx.get_firewall_section(secgroup['name'],
                                                             secgroup['id'])
             time.sleep(constants.ONE_SEC)
         self.assertIsNotNone(nsx_nsgroup)
@@ -108,7 +120,11 @@ class NSXv3SecGroupTest(base.BaseSecGroupTest):
         group_create_body, name = self._create_security_group()
         secgroup = group_create_body['security_group']
         dfw_error_msg = "Firewall section not found for %s!" % secgroup['name']
-        nsx_nsgroup, nsx_dfw_section = \
+        if CONF.plugin.nsxp:
+            nsx_nsgroup, nsx_dfw_section = \
+            self._wait_till_firewall_gets_realize(secgroup, dfw_error_msg, secgroup['tenant_id'])
+        else:
+            nsx_nsgroup, nsx_dfw_section = \
             self._wait_till_firewall_gets_realize(secgroup, dfw_error_msg)
         client = self.security_group_rules_client
         rule_create_body = client.create_security_group_rule(
@@ -121,13 +137,23 @@ class NSXv3SecGroupTest(base.BaseSecGroupTest):
             remote_ip_prefix='0.0.0.0/0',
         )
         secgroup_rule = rule_create_body['security_group_rule']
-        nsx_dfw_rule = self.nsx.get_firewall_section_rule(
+        if CONF.plugin.nsxp:
+            nsx_dfw_rule = self.nsxp.get_firewall_section_rule(
+            nsx_dfw_section,
+            secgroup_rule['id'],secgroup_rule['tenant_id'])
+        else:
+            nsx_dfw_rule = self.nsx.get_firewall_section_rule(
             nsx_dfw_section,
             secgroup_rule['id'])
         self.assertIsNotNone(nsx_dfw_rule)
         # Delete the security group rule
         client.delete_security_group_rule(secgroup_rule['id'])
-        nsx_dfw_rule = self.nsx.get_firewall_section_rule(
+        if CONF.plugin.nsxp:
+            nsx_dfw_rule = self.nsxp.get_firewall_section_rule(
+            nsx_dfw_section,
+            secgroup_rule['id'],secgroup_rule['tenant_id'])
+        else:
+            nsx_dfw_rule = self.nsx.get_firewall_section_rule(
             nsx_dfw_section,
             secgroup_rule['id'])
         self.assertIsNone(nsx_dfw_rule)
@@ -139,7 +165,10 @@ class NSXv3SecGroupTest(base.BaseSecGroupTest):
         group_create_body, name = self._create_security_group()
         secgroup = group_create_body['security_group']
         dfw_error_msg = "Firewall section not found for %s!" % secgroup['name']
-        self._wait_till_firewall_gets_realize(secgroup, dfw_error_msg)
+        if CONF.plugin.nsxp:
+            self._wait_till_firewall_gets_realize(secgroup, dfw_error_msg, secgroup['tenant_id'])
+        else:
+            self._wait_till_firewall_gets_realize(secgroup, dfw_error_msg)
         # List security groups and verify if created group is there in response
         list_body = self.security_groups_client.list_security_groups()
         secgroup_list = list()
@@ -157,7 +186,10 @@ class NSXv3SecGroupTest(base.BaseSecGroupTest):
         self.assertEqual(updated_secgroup['description'], new_description)
         dfw_error_msg = "Firewall section is not updated for %s!" % \
                         updated_secgroup['name']
-        self._wait_till_firewall_gets_realize(updated_secgroup, dfw_error_msg)
+        if CONF.plugin.nsxp:
+            self._wait_till_firewall_gets_realize(updated_secgroup, dfw_error_msg, tenant_id=updated_secgroup['tenant_id'])
+        else:
+            self._wait_till_firewall_gets_realize(updated_secgroup, dfw_error_msg)
 
     @decorators.attr(type='nsxv3')
     @decorators.idempotent_id('e637cc59-c5e6-49b5-a539-e517e780656e')
@@ -168,13 +200,23 @@ class NSXv3SecGroupTest(base.BaseSecGroupTest):
             name=name)
         secgroup = create_body['security_group']
         dfw_error_msg = "Firewall section not found for %s!" % secgroup['name']
-        self._wait_till_firewall_gets_realize(secgroup, dfw_error_msg)
+        if CONF.plugin.nsxp :
+            self._wait_till_firewall_gets_realize(secgroup, dfw_error_msg,tenant_id=secgroup['tenant_id'])
+        else:
+            self._wait_till_firewall_gets_realize(secgroup, dfw_error_msg)
         self.assertEqual(secgroup['name'], name)
         # Delete the security group
         self._delete_security_group(secgroup['id'])
-        nsx_nsgroup = self.nsx.get_ns_group(secgroup['name'],
+        if CONF.plugin.nsxp:
+            nsx_nsgroup = self.nsxp.get_ns_group(secgroup['name'],
+                                            secgroup['id'], os_tenant_id=secgroup['tenant_id'])
+        else:
+            nsx_nsgroup = self.nsx.get_ns_group(secgroup['name'],
                                             secgroup['id'])
-        nsx_dfw_section = self.nsx.get_firewall_section(name, secgroup['id'])
+        if CONF.plugin.nsxp:
+            nsx_dfw_section = self.nsxp.get_firewall_section(name, secgroup['id'],os_tenant_id=secgroup['tenant_id'])
+        else:
+            nsx_dfw_section = self.nsx.get_firewall_section(name, secgroup['id'])
         self.assertIsNone(nsx_nsgroup)
         self.assertIsNone(nsx_dfw_section)
 
@@ -185,7 +227,11 @@ class NSXv3SecGroupTest(base.BaseSecGroupTest):
         create_body, _ = self._create_security_group()
         secgroup = create_body['security_group']
         dfw_error_msg = "Firewall section not found for %s!" % secgroup['name']
-        nsx_nsgroup, nsx_dfw_section = self._wait_till_firewall_gets_realize(
+        if CONF.plugin.nsxp:
+            nsx_nsgroup, nsx_dfw_section = self._wait_till_firewall_gets_realize(
+            secgroup, dfw_error_msg, tenant_id=secgroup['tenant_id'])
+        else:
+            nsx_nsgroup, nsx_dfw_section = self._wait_till_firewall_gets_realize(
             secgroup, dfw_error_msg)
         # Create rules for each protocol
         protocols = ['tcp', 'udp', 'icmp']
@@ -243,7 +289,11 @@ class NSXv3SecGroupTest(base.BaseSecGroupTest):
         create_body, _ = self._create_security_group()
         secgroup = create_body['security_group']
         dfw_error_msg = "Firewall section not found for %s!" % secgroup['name']
-        nsx_nsgroup, nsx_dfw_section = self._wait_till_firewall_gets_realize(
+        if CONF.plugin.nsxp:
+            nsx_nsgroup, nsx_dfw_section = self._wait_till_firewall_gets_realize(
+            secgroup, dfw_error_msg, tenant_id=secgroup['tenant_id'])
+        else:
+            nsx_nsgroup, nsx_dfw_section = self._wait_till_firewall_gets_realize(
             secgroup, dfw_error_msg)
         # Create a security group rule
         client = self.security_group_rules_client
