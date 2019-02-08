@@ -353,7 +353,7 @@ class NSXV3Client(object):
         """
         return self.get_logical_resources("/firewall/sections")
 
-    def get_firewall_section(self, os_name, os_uuid):
+    def get_firewall_section(self, os_name, os_uuid, nsxp=False):
         """
         Get the firewall section by os_name and os_uuid
         """
@@ -362,7 +362,10 @@ class NSXV3Client(object):
                       "present in order to query backend FW section "
                       "created")
             return None
-        nsx_name = os_name + " - " + os_uuid
+        if nsxp:
+            nsx_name = os_name + "_" + os_uuid[:5] + "..." + os_uuid[-5:]
+        else:
+            nsx_name = os_name + " - " + os_uuid
         nsx_firewall_time_counter = 0
         nsx_dfw_section = None
         # wait till timeout or till dfw section
@@ -416,7 +419,7 @@ class NSXV3Client(object):
         res_json = response.json()
         return res_json
 
-    def get_ns_group(self, os_name, os_uuid):
+    def get_ns_group(self, os_name, os_uuid, nsxp=False, os_tenant_id=None):
         """
         Get the NSGroup based on the name provided.
         The name of the nsgroup should follow
@@ -427,7 +430,11 @@ class NSXV3Client(object):
             LOG.error("Name and uuid of OS security group should be "
                       "present in order to query backend nsgroup created")
             return None
-        nsx_name = os_name + " - " + os_uuid
+        if nsxp:
+            nsx_name = os_name + "_" + os_uuid[:5] + "..." + os_uuid[-5:]
+            nsx_name = os_tenant_id + '.' + nsx_name
+        else:
+            nsx_name = os_name + " - " + os_uuid
         nsgroups = self.get_ns_groups()
         return self.get_nsx_resource_by_name(nsgroups, nsx_name)
 
