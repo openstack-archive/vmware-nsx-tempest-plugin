@@ -29,7 +29,7 @@ _opts = [
     (config_nsx.l2gw_group, config_nsx.L2gwGroup),
     (config_nsx.nsxv3_group, config_nsx.NSXv3Group),
     (config_nsx.dns_group, config_nsx.DNSGroup),
-    (config_nsx.barbican_group, config_nsx.BarbicanGroup)
+    (config_nsx.nsx_plugin_group, config_nsx.NSX_PluginGroup)
 ]
 
 
