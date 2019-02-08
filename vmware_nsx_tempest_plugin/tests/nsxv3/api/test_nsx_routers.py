@@ -21,6 +21,7 @@ from tempest import test
 
 from vmware_nsx_tempest_plugin.common import constants
 from vmware_nsx_tempest_plugin.services import nsxv3_client
+from vmware_nsx_tempest_plugin.services import nsxp_client
 
 CONF = config.CONF
 
@@ -49,6 +50,9 @@ class NSXv3RoutersTest(base.BaseAdminNetworkTest):
         cls.nsx = nsxv3_client.NSXV3Client(CONF.nsxv3.nsx_manager,
                                            CONF.nsxv3.nsx_user,
                                            CONF.nsxv3.nsx_password)
+        cls.nsxp = nsxp_client.NSXPClient(CONF.nsxv3.nsx_manager,
+                                          CONF.nsxv3.nsx_user,
+                                          CONF.nsxv3.nsx_password)
 
     @decorators.attr(type='nsxv3')
     @decorators.idempotent_id('0e9938bc-d2a3-4a9a-a4f9-7a93ee8bb344')
@@ -59,6 +63,9 @@ class NSXv3RoutersTest(base.BaseAdminNetworkTest):
         self.addCleanup(self._delete_router, router['id'])
         if CONF.network.backend == 'nsxp':
             time.sleep(constants.NSXP_BACKEND_SMALL_TIME_INTERVAL)
+            nsx_router = self.nsxp.get_logical_router(router['name'],
+                                                      router['id'])
+            self.assertIsNotNone(nsx_router)
         nsx_router = self.nsx.get_logical_router(router['name'],
                                                  router['id'])
         self.assertEqual(router['name'], router_name)
@@ -68,10 +75,13 @@ class NSXv3RoutersTest(base.BaseAdminNetworkTest):
         # neutron and nsx backend
         updated_name = 'updated ' + router_name
         update_body = self.routers_client.update_router(router['id'],
-                                                name=updated_name)
+                                                        name=updated_name)
         updated_router = update_body['router']
         if CONF.network.backend == 'nsxp':
             time.sleep(constants.NSXP_BACKEND_SMALL_TIME_INTERVAL)
+            nsx_router = self.nsxp.get_logical_router(updated_router['name'],
+                                                      updated_router['id'])
+            self.assertIsNotNone(nsx_router)
         nsx_router = self.nsx.get_logical_router(updated_router['name'],
                                                  updated_router['id'])
         self.assertEqual(updated_router['name'], updated_name)
@@ -85,6 +95,9 @@ class NSXv3RoutersTest(base.BaseAdminNetworkTest):
         router = self.create_router(router_name, admin_state_up=True)
         if CONF.network.backend == 'nsxp':
             time.sleep(constants.NSXP_BACKEND_SMALL_TIME_INTERVAL)
+            nsx_router = self.nsxp.get_logical_router(router['name'],
+                                                      router['id'])
+            self.assertIsNotNone(nsx_router)
         nsx_router = self.nsx.get_logical_router(router['name'],
                                                  router['id'])
         self.assertEqual(router['name'], router_name)
@@ -93,6 +106,9 @@ class NSXv3RoutersTest(base.BaseAdminNetworkTest):
         self.routers_client.delete_router(router['id'])
         if CONF.network.backend == 'nsxp':
             time.sleep(constants.NSXP_BACKEND_SMALL_TIME_INTERVAL)
+            nsx_router = self.nsxp.get_logical_router(router['name'],
+                                                      router['id'])
+            self.assertIsNone(nsx_router)
         nsx_router = self.nsx.get_logical_router(router['name'],
                                                  router['id'])
         self.assertIsNone(nsx_router)
