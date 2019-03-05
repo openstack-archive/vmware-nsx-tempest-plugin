@@ -35,8 +35,8 @@ class TestFwaasV2Ops(feature_manager.FeatureManager):
     @classmethod
     def skip_checks(cls):
         super(TestFwaasV2Ops, cls).skip_checks()
-        if not test.is_extension_enabled('fwaasv2', 'network'):
-            msg = "Extension provider-security-group is not enabled."
+        if not test.is_extension_enabled('fwaas_v2', 'network'):
+            msg = "Extension fwaas_v2 is not enabled."
             raise cls.skipException(msg)
 
     @classmethod
@@ -186,7 +186,7 @@ class TestFwaasV2Ops(feature_manager.FeatureManager):
                            fw_group=fw_group)
             return fw_topo
 
-    def create_fw_with_port_topology(self, group_delete, protocol_name):
+    def create_fw_with_port_topology(self, protocol_name, group_delete=True):
         # Create network topo
         network = \
             self.create_topology_network(network_name="fw-network")
