@@ -850,9 +850,14 @@ class FeatureManager(traffic_manager.IperfManager,
             else:
                 break
         if not CONF.nsxv3.ens:
-            self.cmgr_adm.ports_client.update_port(
-                self.loadbalancer['vip_port_id'],
-                security_groups=[self.sg['id']])
+            if barbican:
+                self.cmgr_adm.ports_client.update_port(
+                    self.loadbalancer['vip_port_id'],
+                    security_groups=[self.sg['id']])
+            else:
+                self.ports_client.update_port(
+                    self.loadbalancer['vip_port_id'],
+                    security_groups=[self.sg['id']])
         # create lbaas public interface
         if barbican:
             if not hasattr(self, 'vip_ip_address'):
