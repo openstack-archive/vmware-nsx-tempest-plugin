@@ -9,6 +9,7 @@
 #    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 #    License for the specific language governing permissions and limitations
 #    under the License.
+import time
 
 from tempest.api.network import base
 from tempest.common import custom_matchers
@@ -264,10 +265,16 @@ class NSXv3MacLearningTest(base.BaseNetworkTest):
         test_port = self.create_port(self.network, name=test_port_name)
         self.addCleanup(test_utils.call_and_ignore_notfound_exc,
                         self._delete_port, test_port)
+        if CONF.network.backend == 'nsxp':
+            time.sleep(constants.NSXP_BACKEND_SMALL_TIME_INTERVAL)
         self._check_mac_learning(test_port, mac_learn_state=False)
         updated_os_port = self._update_port_enable_mac_learning(test_port)
+        if CONF.network.backend == 'nsxp':
+            time.sleep(constants.NSXP_BACKEND_SMALL_TIME_INTERVAL)
         self._check_mac_learning(updated_os_port, mac_learn_state=True)
         self._delete_port(updated_os_port)
+        if CONF.network.backend == 'nsxp':
+            time.sleep(constants.NSXP_BACKEND_SMALL_TIME_INTERVAL)
         self.assertIsNone(self.nsx.get_logical_port(updated_os_port['name']),
                           "Port %s is not None" % updated_os_port['name'])
 
@@ -285,12 +292,20 @@ class NSXv3MacLearningTest(base.BaseNetworkTest):
         test_port = self._create_mac_learn_enabled_port(self.network)
         self.addCleanup(test_utils.call_and_ignore_notfound_exc,
                         self._delete_port, test_port)
+        if CONF.network.backend == 'nsxp':
+            time.sleep(constants.NSXP_BACKEND_SMALL_TIME_INTERVAL)
         self._check_mac_learning(test_port, mac_learn_state=True)
         ml_off_port = self._update_port_disable_mac_learning(test_port)
+        if CONF.network.backend == 'nsxp':
+            time.sleep(constants.NSXP_BACKEND_SMALL_TIME_INTERVAL)
         self._check_mac_learning(ml_off_port, mac_learn_state=False)
         ml_on_port = self._update_port_enable_mac_learning(ml_off_port)
+        if CONF.network.backend == 'nsxp':
+            time.sleep(constants.NSXP_BACKEND_SMALL_TIME_INTERVAL)
         self._check_mac_learning(ml_on_port, mac_learn_state=True)
         self._delete_port(ml_on_port)
+        if CONF.network.backend == 'nsxp':
+            time.sleep(constants.NSXP_BACKEND_SMALL_TIME_INTERVAL)
         self.assertIsNone(self.nsx.get_logical_port(ml_on_port['name']),
                           "Port %s is not None" % ml_on_port['name'])
 
@@ -308,11 +323,15 @@ class NSXv3MacLearningTest(base.BaseNetworkTest):
         new_port_name = data_utils.rand_name('updated_port-')
         updated_port = self.update_port(test_port,
                                         name=new_port_name)
+        if CONF.network.backend == 'nsxp':
+            time.sleep(constants.NSXP_BACKEND_SMALL_TIME_INTERVAL)
         updated_nsx_port = self.nsx.get_logical_port(updated_port['name'])
         self.assertEqual(updated_nsx_port['display_name'],
                          updated_port['name'],
                          "Updated port names do not match OS and NSX")
         self._delete_port(updated_port)
+        if CONF.network.backend == 'nsxp':
+            time.sleep(constants.NSXP_BACKEND_SMALL_TIME_INTERVAL)
         self.assertIsNone(self.nsx.get_logical_port(updated_port['name']),
                           "Logical port %s is not None" % updated_port['name'])
 

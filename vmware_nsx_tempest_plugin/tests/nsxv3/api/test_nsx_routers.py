@@ -11,6 +11,7 @@
 #    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 #    License for the specific language governing permissions and limitations
 #    under the License.
+import time
 
 from tempest.api.network import base
 from tempest import config
@@ -18,6 +19,7 @@ from tempest.lib.common.utils import data_utils
 from tempest.lib import decorators
 from tempest import test
 
+from vmware_nsx_tempest_plugin.common import constants
 from vmware_nsx_tempest_plugin.services import nsxv3_client
 
 CONF = config.CONF
@@ -55,6 +57,8 @@ class NSXv3RoutersTest(base.BaseAdminNetworkTest):
         router_name = data_utils.rand_name('router-')
         router = self.create_router(router_name, admin_state_up=True)
         self.addCleanup(self._delete_router, router['id'])
+        if CONF.network.backend == 'nsxp':
+            time.sleep(constants.NSXP_BACKEND_SMALL_TIME_INTERVAL)
         nsx_router = self.nsx.get_logical_router(router['name'],
                                                  router['id'])
         self.assertEqual(router['name'], router_name)
@@ -66,6 +70,8 @@ class NSXv3RoutersTest(base.BaseAdminNetworkTest):
         update_body = self.routers_client.update_router(router['id'],
                                                 name=updated_name)
         updated_router = update_body['router']
+        if CONF.network.backend == 'nsxp':
+            time.sleep(constants.NSXP_BACKEND_SMALL_TIME_INTERVAL)
         nsx_router = self.nsx.get_logical_router(updated_router['name'],
                                                  updated_router['id'])
         self.assertEqual(updated_router['name'], updated_name)
@@ -77,12 +83,16 @@ class NSXv3RoutersTest(base.BaseAdminNetworkTest):
         # Create a router
         router_name = data_utils.rand_name('router-')
         router = self.create_router(router_name, admin_state_up=True)
+        if CONF.network.backend == 'nsxp':
+            time.sleep(constants.NSXP_BACKEND_SMALL_TIME_INTERVAL)
         nsx_router = self.nsx.get_logical_router(router['name'],
                                                  router['id'])
         self.assertEqual(router['name'], router_name)
         self.assertIsNotNone(nsx_router)
         # Delete the router and verify it is deleted on nsx backend
         self.routers_client.delete_router(router['id'])
+        if CONF.network.backend == 'nsxp':
+            time.sleep(constants.NSXP_BACKEND_SMALL_TIME_INTERVAL)
         nsx_router = self.nsx.get_logical_router(router['name'],
                                                  router['id'])
         self.assertIsNone(nsx_router)
