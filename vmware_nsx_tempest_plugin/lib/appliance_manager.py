@@ -95,14 +95,18 @@ class ApplianceManager(manager.NetworkScenarioTest):
     def get_server_key(self, server):
         return self.topology_keypairs[server['key_name']]['private_key']
 
-    def create_topology_router(self, router_name, routers_client=None,
+    def create_topology_router(self, router_name=None, routers_client=None,
                                tenant_id=None, set_gateway=True, **kwargs):
         if not routers_client:
             routers_client = self.routers_client
         if not tenant_id:
             tenant_id = routers_client.tenant_id
-        router_name_ = constants.APPLIANCE_NAME_STARTS_WITH + router_name
-        name = data_utils.rand_name(router_name_)
+        if router_name:
+            router_name_ = constants.APPLIANCE_NAME_STARTS_WITH + router_name
+        if router_name:
+            name = data_utils.rand_name(router_name_)
+        else:
+            name = data_utils.rand_name()
         if CONF.network.backend == "nsxv3":
             router = routers_client.create_router(
                 name=name, admin_state_up=True, tenant_id=tenant_id)['router']

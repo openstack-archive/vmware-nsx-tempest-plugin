@@ -485,6 +485,17 @@ class NSXV3Client(object):
         response = self.get(endpoint)
         return response.json()
 
+    def get_logical_router_advertisement_rules(self, lrouter):
+        """Get logical router advertisement"""
+        if not lrouter:
+            LOG.error("Logical router needs to be present in order "
+                      "to get router advertisement!")
+            return None
+        endpoint = "/logical-routers/%s/routing/advertisement/rules" % lrouter['id']
+        response = self.get(endpoint)
+        return response.json()
+
+
     def get_logical_dhcp_servers(self):
         """
         Get all logical DHCP servers on NSX backend

@@ -21,6 +21,7 @@ from tempest import config
 from tempest.lib.common.utils import data_utils
 from tempest.lib.common.utils import test_utils
 from tempest.lib import exceptions as lib_exc
+from tempest.common.utils.linux import remote_client
 
 from vmware_nsx_tempest_plugin._i18n import _
 from vmware_nsx_tempest_plugin.common import constants
@@ -703,7 +704,7 @@ class FeatureManager(traffic_manager.IperfManager,
                              pool_protocol=None, pool_port=None,
                              vip_subnet_id=None, barbican_container=None,
                              lb_id=None, count=None,
-                             clean_up=None):
+                             clean_up=None, create_fip=True):
         count = 0
         lb_name = None
         if vip_subnet_id is None:
@@ -877,11 +878,12 @@ class FeatureManager(traffic_manager.IperfManager,
                         members=self.members,
                         listener_id=self.listener['id'])
         else:
-            vip_fip = \
-                self.create_floatingip(self.loadbalancer,
-                                       port_id=self.loadbalancer['vip_port_id']
-                                       )
-            self.vip_ip_address = vip_fip['floating_ip_address']
+            if create_fip:
+                vip_fip = \
+                    self.create_floatingip(self.loadbalancer,
+                                           port_id=self.loadbalancer['vip_port_id']
+                                          )
+                self.vip_ip_address = vip_fip['floating_ip_address']
             pools = self.pools_client.show_pool(
                 self.pool['id'])
             return dict(lb_id=lb_id, pool=pools,
@@ -1294,3 +1296,25 @@ class FeatureManager(traffic_manager.IperfManager,
             self.assertIn(Present, "True")
         else:
             self.assertIn(Present, "False")
+ 
+    def check_router_components_on_edge(self, router):
+        edge_ips = CONF.edge_cluster.edge_ip 
+        nsx_dr_rtr_name = "DR-" + router['name'] 
+        dr_present = False
+        nsx_sr_rtr_name = "SR-" + router['name']
+        sr_present = False
+        for nsx_edge_ip in edge_ips:
+            ssh_client = remote_client.RemoteClient(
+                nsx_edge_ip, 'root', 'Admin!23Admin')
+            command = "nsxcli -c get logical-router | awk {'print $4'}"
+            data = ssh_client.exec_command(command)
+            result = data.split('\n')
+            present = False
+            present = [True for el in result if nsx_sr_rtr_name in el]
+            if present:
+                sr_present = True
+            present = False
+            present = [True for el in result if nsx_dr_rtr_name in el]
+            if present:
+		dr_present = True
+        return[{'dr_present' : dr_present},{'sr_present' : sr_present}]
