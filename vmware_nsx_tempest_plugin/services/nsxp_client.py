@@ -125,7 +125,7 @@ class NSXPClient(object):
         """
         NSX-T API Put request for certificate Management
         """
-        endpoint = ("/%s/%s" % (component, comp_id))
+        endpoint = ("%s/%s" % (component, comp_id))
         response = self.put(endpoint=endpoint, body=body)
         return response
 
@@ -142,7 +142,7 @@ class NSXPClient(object):
         """
         NSX-T API delete request for certificate Management
         """
-        endpoint = ("/%s/%s" % (component, comp_id))
+        endpoint = ("%s/%s" % (component, comp_id))
         response = self.delete(endpoint=endpoint)
         return response
 
@@ -313,3 +313,46 @@ class NSXPClient(object):
         nsx_name = os_name + "_" + os_uuid[:5] + "..." + os_uuid[-5:]
         nsgroups = self.get_ns_groups(tenant_id=os_tenant_id)
         return self.get_nsx_resource_by_name(nsgroups, nsx_name)
+
+    def get_logical_switches(self):
+        """
+        Retrieve all logical switches on NSX backend
+        """
+        return self.get_logical_resources("segments")
+
+    def get_logical_switch(self, os_name, os_uuid):
+        """
+        Get the logical switch based on the name and uuid provided.
+
+        The name of the logical switch should follow
+            <os_network_name>_<first 5 os uuid>...<last 5 os uuid>
+        Return logical switch if found, otherwise return None
+        """
+        if not os_name or not os_uuid:
+            LOG.error("Name and uuid of OpenStack L2 network need to be "
+                      "present in order to query backend logical switch!")
+            return None
+        nsx_name = os_name + "_" + os_uuid[:5] + "..." + os_uuid[-5:]
+        lswitches = self.get_logical_switches()
+        return self.get_nsx_resource_by_name(lswitches, nsx_name)
+
+    def get_logical_router_nat_rules(self, lrouter):
+        """
+        Get all user defined NAT rules of the specific logical router
+        """
+        if not lrouter:
+            LOG.error("Logical router needs to be present in order "
+                      "to get the NAT rules")
+            return None
+        endpoint = "tier-1s/%s/nat/USER/nat-rules" % lrouter['id']
+        return self.get_logical_resources(endpoint)
+
+    def get_logical_router_advertisement(self, lrouter):
+        """Get logical router advertisement"""
+        if not lrouter:
+            LOG.error("Logical router needs to be present in order "
+                      "to get router advertisement!")
+            return None
+        endpoint = "/logical-routers/%s/routing/advertisement" % lrouter['id']
+        response = self.get(endpoint)
+        return response.json()

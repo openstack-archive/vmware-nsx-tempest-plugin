@@ -13,7 +13,7 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
-
+import time
 from oslo_log import log as logging
 
 from tempest.common import utils
@@ -24,7 +24,9 @@ from tempest.lib import decorators
 from tempest.lib.common.utils import data_utils
 from tempest.lib.common.utils import test_utils
 
+from vmware_nsx_tempest_plugin.common import constants
 from vmware_nsx_tempest_plugin.services import nsxv3_client
+from vmware_nsx_tempest_plugin.services import nsxp_client
 from vmware_nsx_tempest_plugin.services.qos import base_qos
 from vmware_nsx_tempest_plugin.tests.scenario import manager
 
@@ -41,8 +43,8 @@ class TestCertificateMgmt(manager.NetworkScenarioTest):
     @classmethod
     def skip_checks(cls):
         super(TestCertificateMgmt, cls).skip_checks()
-        if not (CONF.network.project_networks_reachable
-                or CONF.network.public_network_id):
+        if not (CONF.network.project_networks_reachable or
+                CONF.network.public_network_id):
             msg = ('Either project_networks_reachable must be true, or\
                 public_network_id must be defined.')
             raise cls.skipException(msg)
@@ -55,7 +57,11 @@ class TestCertificateMgmt(manager.NetworkScenarioTest):
         cls.set_network_resources()
         super(TestCertificateMgmt, cls).setup_credentials()
         cls.nsx = nsxv3_client.NSXV3Client(CONF.nsxv3.nsx_manager,
-            CONF.nsxv3.nsx_user, CONF.nsxv3.nsx_password)
+                                           CONF.nsxv3.nsx_user,
+                                           CONF.nsxv3.nsx_password)
+        cls.nsxp = nsxp_client.NSXPClient(CONF.nsxv3.nsx_manager,
+                                          CONF.nsxv3.nsx_user,
+                                          CONF.nsxv3.nsx_password)
 
     @classmethod
     def resource_setup(cls):
@@ -121,7 +127,7 @@ class TestCertificateMgmt(manager.NetworkScenarioTest):
         msg = 'Error: NSX admin is able to modify/delete'
         if all(x in response.json()['error_message'] for x in self.error_msg):
             LOG.info('NSX admin is unable to modify/delete '
-                'the openstack object')
+                     'the openstack object')
         else:
             raise Exception(msg)
 
@@ -131,13 +137,13 @@ class TestCertificateMgmt(manager.NetworkScenarioTest):
         and a logical port attached to the network
         """
         self.network = self._create_network(namestart="net-ca")
-        self.subnet = self._create_subnet(self.network,
-            cidr=CONF.network.project_network_cidr)
+        self.subnet = self._create_subnet(
+            self.network, cidr=CONF.network.project_network_cidr)
         self.port = self._create_port(network_id=self.network['id'],
-            namestart='ca')
+                                      namestart='ca')
         msg = 'Logical Port %s not found' % self.port['name']
-        self.assertIsNotNone(self.nsx.get_logical_port(
-            self.port['name']), msg)
+        self.assertIsNotNone(self.nsx.get_logical_port(self.port['name']),
+                             msg)
         data = self.nsx.get_logical_port(self.port['name'])
         return data
 
@@ -163,24 +169,40 @@ class TestCertificateMgmtOps(TestCertificateMgmt):
         Verify if NSX admin is unable to modify this network
         """
         self.network = self._create_network()
-        self.subnet = self._create_subnet(self.network,
-            cidr=CONF.network.project_network_cidr)
+        self.subnet = self._create_subnet(
+            self.network, cidr=CONF.network.project_network_cidr)
         #check backend if the network was created
         msg = 'network %s not found' % self.network['name']
+        if CONF.network.backend == 'nsxp':
+            time.sleep(constants.NSXP_BACKEND_SMALL_TIME_INTERVAL)
+            self.assertIsNotNone(self.nsxp.get_logical_switch(
+                self.network['name'], self.network['id']), msg)
         self.assertIsNotNone(self.nsx.get_logical_switch(
             self.network['name'], self.network['id']), msg)
+        if CONF.network.backend == 'nsxp':
+            data_policy = self.nsxp.get_logical_switch(self.network['name'],
+                                                       self.network['id'])
+            self.assertEqual(data_policy['_create_user'], self.openstack_tag,
+                             'Incorrect tag for the create user')
         data = self.nsx.get_logical_switch(self.network['name'],
-            self.network['id'])
+                                           self.network['id'])
         """
         Check if backend shows openstack
         as the create user for the object
         """
         self.assertEqual(data['_create_user'], self.openstack_tag,
-            'Incorrect tag for the create user')
+                         'Incorrect tag for the create user')
         #try to update network name as NSX admin
-        data.update({"display_name": "nsx_modified_switch"})
-        response = self.nsx.ca_put_request(component='logical-switches',
-            comp_id=data['id'], body=data)
+        if CONF.network.backend == 'nsxp':
+            data_policy.update({"display_name": "nsx_modified_switch"})
+            response = self.nsxp.ca_put_request(component='segments',
+                                                comp_id=data_policy['id'],
+                                                body=data_policy)
+        else:
+            data.update({"display_name": "nsx_modified_switch"})
+            response = self.nsx.ca_put_request(component='segments',
+                                               comp_id=data['id'],
+                                               body=data)
         self.parse_response(response)
 
     @decorators.attr(type='nsxv3')
@@ -193,8 +215,8 @@ class TestCertificateMgmtOps(TestCertificateMgmt):
         Verify if NSX admin can not delete this router
         """
         self.network = self._create_network()
-        self.subnet = self._create_subnet(self.network,
-            cidr=CONF.network.project_network_cidr)
+        self.subnet = self._create_subnet(
+            self.network, cidr=CONF.network.project_network_cidr)
         #create router and add an interface
         self.router = self._create_router(
             router_name=data_utils.rand_name('router-cert-mgmt'),
@@ -208,19 +230,19 @@ class TestCertificateMgmtOps(TestCertificateMgmt):
         self.assertIsNotNone(self.nsx.get_logical_router(
             self.router['name'], self.router['id']), msg)
         data = self.nsx.get_logical_router(self.router['name'],
-            self.router['id'])
+                                           self.router['id'])
         """
         Check if backend shows openstack
         as the create user for the object
         """
         self.assertEqual(data['_create_user'], self.openstack_tag,
-            'Incorrect tag for the create user')
+                         'Incorrect tag for the create user')
         #Obtain any router port corresponding to the logical router
         rtr_ports = self.nsx.get_logical_router_ports(data)
         #try to update router name as NSX admin
         data.update({"display_name": "nsx_modified_router"})
         response = self.nsx.ca_put_request(component='logical-routers',
-            comp_id=data['id'], body=data)
+                                           comp_id=data['id'], body=data)
         self.parse_response(response)
         #try to delete logical router port as NSX admin
         if len(rtr_ports) != 0:
@@ -246,7 +268,7 @@ class TestCertificateMgmtOps(TestCertificateMgmt):
         #obtain all switching profiles at the backend
         qos_policies = self.nsx.get_switching_profiles()
         nsx_policy = self.nsx.get_nsx_resource_by_name(qos_policies,
-            policy['name'])
+                                                       policy['name'])
         #check backend if the qos policy was created
         msg = 'Qos policy %s not found' % policy['name']
         self.assertIsNotNone(self.nsx.get_switching_profile(
@@ -257,15 +279,15 @@ class TestCertificateMgmtOps(TestCertificateMgmt):
         as the create user for the object
         """
         self.assertEqual(data['_create_user'], self.openstack_tag,
-            'Incorrect tag for the create user')
+                         'Incorrect tag for the create user')
         #try to update qos policy  as NSX admin
         data.update({"display_name": "nsx_modified_qos-policy"})
         response = self.nsx.ca_put_request(component='switching-profiles',
-            comp_id=data['id'], body=data)
+                                           comp_id=data['id'], body=data)
         self.parse_response(response)
         #try to delete qos policy as NSX admin
         response = self.nsx.ca_delete_request(component='switching-profiles',
-            comp_id=data['id'])
+                                              comp_id=data['id'])
         self.parse_response(response)
 
     @decorators.attr(type='nsxv3')
@@ -283,25 +305,25 @@ class TestCertificateMgmtOps(TestCertificateMgmt):
         self.assertIsNotNone(self.nsx.get_firewall_section(
             self.security_group['name'], self.security_group['id']), msg)
         data = self.nsx.get_firewall_section(self.security_group['name'],
-            self.security_group['id'])
+                                             self.security_group['id'])
         """
         Check if backend shows openstack
         as the create user for the object
         """
         self.assertEqual(data['_create_user'], self.openstack_tag,
-            'Incorrect tag for the create user')
+                         'Incorrect tag for the create user')
         #obtain firewall rules related to the security group
         fw_rules = self.nsx.get_firewall_section_rules(data)
         #try to update security group as NSX admin
         data.update({"display_name": "nsx_modified_security_group"})
         response = self.nsx.ca_put_request(component='firewall/sections',
-            comp_id=data['id'], body=data)
+                                           comp_id=data['id'], body=data)
         self.parse_response(response)
         #try to delete logical firewall rule as NSX admin
         if len(fw_rules) != 0:
             component = 'firewall/sections/' + data['id'] + '/rules'
             response = self.nsx.ca_delete_request(component=component,
-                comp_id=fw_rules[0]['id'])
+                                                  comp_id=fw_rules[0]['id'])
             self.parse_response(response)
 
     @decorators.attr(type='nsxv3')
@@ -317,15 +339,15 @@ class TestCertificateMgmtOps(TestCertificateMgmt):
         """
         data = self.ca_topo()
         self.assertEqual(data['_create_user'], self.openstack_tag,
-            'Incorrect tag for the create user')
+                         'Incorrect tag for the create user')
         #try to update logical port as NSX admin
         data.update({"display_name": "nsx_modified_logical_port"})
         response = self.nsx.ca_put_request(component='logical-ports',
-            comp_id=data['id'], body=data)
+                                           comp_id=data['id'], body=data)
         self.parse_response(response)
         #try to delete logical port as NSX admin
         response = self.nsx.ca_delete_request(component='logical-ports',
-                comp_id=data['id'])
+                                              comp_id=data['id'])
         self.parse_response(response)
 
     @decorators.attr(type='nsxv3')
@@ -344,7 +366,7 @@ class TestCertificateMgmtOps(TestCertificateMgmt):
         #obtain all switching profiles at the backend
         qos_policies = self.nsx.get_switching_profiles()
         nsx_policy = self.nsx.get_nsx_resource_by_name(qos_policies,
-            policy['name'])
+                                                       policy['name'])
         #check backend if the qos policy was created
         msg = 'Qos policy %s not found' % policy['name']
         self.assertIsNotNone(self.nsx.get_switching_profile(
@@ -352,10 +374,11 @@ class TestCertificateMgmtOps(TestCertificateMgmt):
         data = self.nsx.get_switching_profile(nsx_policy['id'])
         #try to delete qos policy as NSX admin
         endpoint = ("/%s/%s" % ('switching-profiles',
-            data['id']))
+                    data['id']))
         response = self.nsx.delete_super_admin(endpoint)
         self.assertEqual(response.status_code, 200,
-            "Superadmin unable to delete the qos switching profile")
+                         "Superadmin unable to "
+                         "delete the qos switching profile")
 
     @decorators.attr(type='nsxv3')
     @decorators.idempotent_id('a874d78b-eb7a-4df6-a01b-dc0a22422dc2')

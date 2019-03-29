@@ -14,6 +14,7 @@
 #    under the License.
 
 import collections
+import time
 
 from oslo_log import log as logging
 
@@ -24,7 +25,9 @@ from tempest.lib.common.utils import test_utils
 from tempest.lib import decorators
 from tempest.lib import exceptions
 
+from vmware_nsx_tempest_plugin.common import constants
 from vmware_nsx_tempest_plugin.services import nsxv3_client
+from vmware_nsx_tempest_plugin.services import nsxp_client
 from vmware_nsx_tempest_plugin.tests.scenario import manager
 
 CONF = config.CONF
@@ -70,6 +73,9 @@ class TestRouterNoNATOps(manager.NetworkScenarioTest):
         cls.nsx = nsxv3_client.NSXV3Client(CONF.nsxv3.nsx_manager,
                                            CONF.nsxv3.nsx_user,
                                            CONF.nsxv3.nsx_password)
+        cls.nsxp = nsxp_client.NSXPClient(CONF.nsxv3.nsx_manager,
+                                          CONF.nsxv3.nsx_user,
+                                          CONF.nsxv3.nsx_password)
 
     def setUp(self):
         super(TestRouterNoNATOps, self).setUp()
@@ -245,6 +251,12 @@ class TestRouterNoNATOps(manager.NetworkScenarioTest):
         """
         snat = True
         self._setup_network_topo(enable_snat=snat)
+        if CONF.network.backend == 'nsxp':
+            time.sleep(constants.NSXP_BACKEND_SMALL_TIME_INTERVAL)
+            nsx_router_policy = self.nsxp.get_logical_router(
+                self.router['name'], self.router['id'])
+            self.assertNotEqual(nsx_router_policy, None)
+            self.assertEqual(nsx_router_policy['resource_type'], 'Tier1')
         nsx_router = self.nsx.get_logical_router(
             self.router['name'], self.router['id'])
         self.assertNotEqual(nsx_router, None)
@@ -265,22 +277,41 @@ class TestRouterNoNATOps(manager.NetworkScenarioTest):
         """Test update router from NATed to NoNAT scenario"""
         snat = True
         self._setup_network_topo(enable_snat=snat)
+        if CONF.network.backend == 'nsxp':
+            time.sleep(constants.NSXP_BACKEND_SMALL_TIME_INTERVAL)
+            nsx_router_policy = self.nsxp.get_logical_router(
+                self.router['name'], self.router['id'])
+            self.assertNotEqual(nsx_router_policy, None)
+            self.assertEqual(nsx_router_policy['resource_type'], 'Tier1')
         nsx_router = self.nsx.get_logical_router(
             self.router['name'], self.router['id'])
         self.assertNotEqual(nsx_router, None)
         self.assertEqual(nsx_router['router_type'], 'TIER1')
         # Check nat rules created correctly
-        nat_rules = self.nsx.get_logical_router_nat_rules(nsx_router)
+        if CONF.network.backend == 'nsxp':
+            nat_rules = self.nsxp.get_logical_router_nat_rules(
+                nsx_router_policy)
+        else:
+            nat_rules = self.nsx.get_logical_router_nat_rules(nsx_router)
+            router_adv = self.nsx.get_logical_router_advertisement(nsx_router)
         # Check router advertisement is correctly set
-        router_adv = self.nsx.get_logical_router_advertisement(nsx_router)
         adv_msg = "Tier1 router's advertise_nsx_connected_routes is not True"
         nat_msg = "Tier1 router's advertise_nat_routes is not False"
         if any(d['action'] == 'NO_DNAT' for d in nat_rules):
             self.assertTrue(len(nat_rules) == 4)
         else:
             self.assertTrue(len(nat_rules) == 3)
-        self.assertTrue(router_adv['advertise_nat_routes'], nat_msg)
-        self.assertFalse(router_adv['advertise_nsx_connected_routes'], adv_msg)
+        if CONF.network.backend == 'nsxp':
+            self.assertTrue(
+                'TIER1_NAT' in nsx_router_policy['route_advertisement_types'],
+                nat_msg)
+            self.assertFalse(
+                'TIER1_CONNECTED' in nsx_router_policy[
+                    'route_advertisement_types'], adv_msg)
+        else:
+            self.assertTrue(router_adv['advertise_nat_routes'], nat_msg)
+            self.assertFalse(
+                router_adv['advertise_nsx_connected_routes'], adv_msg)
         self._check_network_internal_connectivity(network=self.network)
         self._check_network_vm_connectivity(network=self.network)
         self._check_nonat_network_connectivity(should_connect=False)
@@ -293,42 +324,80 @@ class TestRouterNoNATOps(manager.NetworkScenarioTest):
             'enable_snat': (not snat)}
         self._update_router(self.router['id'], self.cmgr_adm.routers_client,
                             external_gateway_info)
+        if CONF.network.backend == 'nsxp':
+            time.sleep(constants.NSXP_BACKEND_SMALL_TIME_INTERVAL)
+            nsx_router_policy = self.nsxp.get_logical_router(
+                self.router['name'], self.router['id'])
+            self.assertNotEqual(nsx_router_policy, None)
+            self.assertEqual(nsx_router_policy['resource_type'], 'Tier1')
         nsx_router = self.nsx.get_logical_router(
             self.router['name'], self.router['id'])
         self.assertNotEqual(nsx_router, None)
         self.assertEqual(nsx_router['router_type'], 'TIER1')
         # Check nat rules created correctly
-        nat_rules = self.nsx.get_logical_router_nat_rules(nsx_router)
+        if CONF.network.backend == 'nsxp':
+            nat_rules = self.nsxp.get_logical_router_nat_rules(
+                nsx_router_policy)
+        else:
+            nat_rules = self.nsx.get_logical_router_nat_rules(nsx_router)
+            router_adv = self.nsx.get_logical_router_advertisement(nsx_router)
         # Check router advertisement is correctly set
-        router_adv = self.nsx.get_logical_router_advertisement(nsx_router)
         if len(nat_rules) == 1:
             self.assertTrue(any(d['action'] == 'NO_DNAT' for d in nat_rules))
         else:
             self.assertTrue(len(nat_rules) == 0)
-        self.assertFalse(router_adv['advertise_nat_routes'], nat_msg)
-        self.assertTrue(router_adv['advertise_nsx_connected_routes'], adv_msg)
+        if CONF.network.backend == 'nsxp':
+            self.assertFalse(
+                'TIER1_NAT' in nsx_router_policy[
+                    'route_advertisement_types'], nat_msg)
+            self.assertTrue(
+                'TIER1_CONNECTED' in nsx_router_policy[
+                    'route_advertisement_types'], adv_msg)
+        else:
+            self.assertFalse(router_adv['advertise_nat_routes'], nat_msg)
+            self.assertTrue(
+                router_adv['advertise_nsx_connected_routes'], adv_msg)
         self._check_nonat_network_connectivity()
 
     def _test_router_nat_update_when_no_snat(self):
         """Test update router from NATed to NoNAT scenario"""
         snat = False
         self._setup_network_topo(enable_snat=snat)
+        if CONF.network.backend == 'nsxp':
+            time.sleep(constants.NSXP_BACKEND_SMALL_TIME_INTERVAL)
+            nsx_router_policy = self.nsxp.get_logical_router(
+                self.router['name'], self.router['id'])
+            self.assertNotEqual(nsx_router_policy, None)
+            self.assertEqual(nsx_router_policy['resource_type'], 'Tier1')
         nsx_router = self.nsx.get_logical_router(
             self.router['name'], self.router['id'])
         self.assertNotEqual(nsx_router, None)
         self.assertEqual(nsx_router['router_type'], 'TIER1')
         # Check nat rules created correctly
-        nat_rules = self.nsx.get_logical_router_nat_rules(nsx_router)
+        if CONF.network.backend == 'nsxp':
+            nat_rules = self.nsxp.get_logical_router_nat_rules(
+                nsx_router_policy)
+        else:
+            nat_rules = self.nsx.get_logical_router_nat_rules(nsx_router)
+            router_adv = self.nsx.get_logical_router_advertisement(nsx_router)
         # Check router advertisement is correctly set
-        router_adv = self.nsx.get_logical_router_advertisement(nsx_router)
         adv_msg = "Tier1 router's advertise_nsx_connected_routes is not True"
         nat_msg = "Tier1 router's advertise_nat_routes is not False"
         if len(nat_rules) == 1:
             self.assertTrue(any(d['action'] == 'NO_DNAT' for d in nat_rules))
         else:
             self.assertTrue(len(nat_rules) == 0)
-        self.assertFalse(router_adv['advertise_nat_routes'], nat_msg)
-        self.assertTrue(router_adv['advertise_nsx_connected_routes'], adv_msg)
+        if CONF.network.backend == 'nsxp':
+            self.assertFalse(
+                'TIER1_NAT' in nsx_router_policy[
+                    'route_advertisement_types'], nat_msg)
+            self.assertTrue(
+                'TIER1_CONNECTED' in nsx_router_policy[
+                    'route_advertisement_types'], adv_msg)
+        else:
+            self.assertFalse(router_adv['advertise_nat_routes'], nat_msg)
+            self.assertTrue(
+                router_adv['advertise_nsx_connected_routes'], adv_msg)
         self._check_nonat_network_connectivity()
         # Update router to Enable snat and associate floating ip
         external_gateway_info = {
@@ -338,20 +407,39 @@ class TestRouterNoNATOps(manager.NetworkScenarioTest):
                             external_gateway_info)
         floating_ip = self.create_floating_ip(self.server)
         self.floating_ip_tuple = Floating_IP_tuple(floating_ip, self.server)
+        if CONF.network.backend == 'nsxp':
+            time.sleep(constants.NSXP_BACKEND_SMALL_TIME_INTERVAL)
+            nsx_router_policy = self.nsxp.get_logical_router(
+                self.router['name'], self.router['id'])
+            self.assertNotEqual(nsx_router_policy, None)
+            self.assertEqual(nsx_router_policy['resource_type'], 'Tier1')
         nsx_router = self.nsx.get_logical_router(
             self.router['name'], self.router['id'])
         self.assertNotEqual(nsx_router, None)
         self.assertEqual(nsx_router['router_type'], 'TIER1')
         # Check nat rules created correctly
-        nat_rules = self.nsx.get_logical_router_nat_rules(nsx_router)
+        if CONF.network.backend == 'nsxp':
+            nat_rules = self.nsxp.get_logical_router_nat_rules(
+                nsx_router_policy)
+        else:
+            nat_rules = self.nsx.get_logical_router_nat_rules(nsx_router)
+            router_adv = self.nsx.get_logical_router_advertisement(nsx_router)
         # Check router advertisement is correctly set
-        router_adv = self.nsx.get_logical_router_advertisement(nsx_router)
         if any(d['action'] == 'NO_DNAT' for d in nat_rules):
             self.assertTrue(len(nat_rules) == 4)
         else:
             self.assertTrue(len(nat_rules) == 3)
-        self.assertTrue(router_adv['advertise_nat_routes'], nat_msg)
-        self.assertFalse(router_adv['advertise_nsx_connected_routes'], adv_msg)
+        if CONF.network.backend == 'nsxp':
+            self.assertTrue(
+                'TIER1_NAT' in nsx_router_policy[
+                    'route_advertisement_types'], nat_msg)
+            self.assertFalse(
+                'TIER1_CONNECTED' in nsx_router_policy[
+                    'route_advertisement_types'], adv_msg)
+        else:
+            self.assertTrue(router_adv['advertise_nat_routes'], nat_msg)
+            self.assertFalse(
+                router_adv['advertise_nsx_connected_routes'], adv_msg)
         self._check_network_internal_connectivity(network=self.network)
         self._check_network_vm_connectivity(network=self.network)
 
