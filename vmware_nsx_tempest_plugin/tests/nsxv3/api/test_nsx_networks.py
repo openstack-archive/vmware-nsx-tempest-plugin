@@ -10,11 +10,15 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
+import time
+
 from tempest.api.network import base
 from tempest import config
 from tempest.lib.common.utils import data_utils
 from tempest.lib import decorators
 
+from vmware_nsx_tempest_plugin.common import constants
+from vmware_nsx_tempest_plugin.services import nsxp_client
 from vmware_nsx_tempest_plugin.services import nsxv3_client
 
 CONF = config.CONF
@@ -35,6 +39,9 @@ class NSXv3NetworksTest(base.BaseNetworkTest):
         cls.nsx = nsxv3_client.NSXV3Client(CONF.nsxv3.nsx_manager,
                                            CONF.nsxv3.nsx_user,
                                            CONF.nsxv3.nsx_password)
+        cls.nsxp = nsxp_client.NSXPClient(CONF.nsxv3.nsx_manager,
+                                          CONF.nsxv3.nsx_user,
+                                          CONF.nsxv3.nsx_password)
 
     @decorators.attr(type='nsxv3')
     @decorators.idempotent_id('63085723-23ae-4109-ac86-69f895097957')
@@ -43,6 +50,12 @@ class NSXv3NetworksTest(base.BaseNetworkTest):
         name = data_utils.rand_name('network-')
         network = self.create_network(network_name=name)
         net_id = network['id']
+        if CONF.network.backend == 'nsxp':
+            time.sleep(constants.NSXP_BACKEND_SMALL_TIME_INTERVAL)
+            nsxp_network = self.nsxp.get_logical_switch(network['name'],
+                                                        network['id'])
+            self.assertEqual('ACTIVE', network['status'])
+            self.assertIsNotNone(nsxp_network)
         nsx_network = self.nsx.get_logical_switch(network['name'],
                                                   network['id'])
         self.assertEqual('ACTIVE', network['status'])
@@ -51,12 +64,23 @@ class NSXv3NetworksTest(base.BaseNetworkTest):
         new_name = "New_network"
         body = self.networks_client.update_network(net_id, name=new_name)
         updated_net = body['network']
+        if CONF.network.backend == 'nsxp':
+            time.sleep(constants.NSXP_BACKEND_SMALL_TIME_INTERVAL)
+            nsxp_network = self.nsxp.get_logical_switch(updated_net['name'],
+                                                        updated_net['id'])
+            self.assertEqual(updated_net['name'], new_name)
+            self.assertIsNotNone(nsxp_network)
         nsx_network = self.nsx.get_logical_switch(updated_net['name'],
                                                   updated_net['id'])
         self.assertEqual(updated_net['name'], new_name)
         self.assertIsNotNone(nsx_network)
         # Verify delete network
         self.networks_client.delete_network(updated_net['id'])
+        if CONF.network.backend == 'nsxp':
+            time.sleep(constants.NSXP_BACKEND_SMALL_TIME_INTERVAL)
+            nsxp_network = self.nsxp.get_logical_switch(updated_net['name'],
+                                                        updated_net['id'])
+            self.assertIsNone(nsxp_network)
         nsx_network = self.nsx.get_logical_switch(updated_net['name'],
                                                   updated_net['id'])
         self.assertIsNone(nsx_network)
