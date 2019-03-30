@@ -493,14 +493,30 @@ class ApplianceManager(manager.NetworkScenarioTest):
         if not ports_client:
             ports_client = self.ports_client
         port = ports_client.create_port(network_id=network['id'], **args)
-        self.addCleanup(ports_client.delete_port, port['port']['id'])
+        self.addCleanup(test_utils.call_and_ignore_notfound_exc,
+                        ports_client.delete_port, port['port']['id'])
         return port
 
     def update_topology_port(self, port_id, ports_client=None,
                              **kwargs):
         if not ports_client:
             ports_client = self.ports_client
-        ports_client.update_port(port_id, **kwargs)
+        port = ports_client.update_port(port_id, **kwargs)
+        return port
+
+    def show_topology_port(self, port_id, ports_client=None,
+                           **kwargs):
+        if not ports_client:
+            ports_client = self.ports_client
+        port = ports_client.show_port(port_id, **kwargs)
+        return port
+
+    def delete_topology_port(self, port_id, ports_client=None,
+                             **kwargs):
+        if not ports_client:
+            ports_client = self.ports_client
+        port = ports_client.delete_port(port_id, **kwargs)
+        return port
 
     def _list_ports(self, *args, **kwargs):
         """List ports using admin creds """
