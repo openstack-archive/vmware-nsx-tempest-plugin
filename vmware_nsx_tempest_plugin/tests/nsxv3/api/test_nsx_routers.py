@@ -119,3 +119,28 @@ class NSXv3RoutersTest(base.BaseAdminNetworkTest):
         for router in list_body.get('router', []):
             if router['id'] == router_id:
                 self.routers_client.delete_router(router_id)
+
+
+class TestT1LrHaRelocation(base.BaseAdminNetworkTest):
+    """
+    Deploy Routers and check the LR router got deployed with
+    enable_standby_relocation mode set to True.
+    """
+
+    @decorators.attr(type='nsxv3')
+    def test_deploy_router_ha_with_relocation_enabled(self):
+        # Check Standby relocation is enabled on backend after T1 Router got
+        # deployed.
+        nsx = nsxv3_client.NSXV3Client(CONF.nsxv3.nsx_manager,
+                                       CONF.nsxv3.nsx_user,
+                                       CONF.nsxv3.nsx_password)
+        router_name = data_utils.rand_name('router-')
+        body = self.create_router(
+            router_name=router_name, admin_state_up=True,
+            external_network_id=CONF.network.public_network_id)
+        nsx_router = nsx.get_logical_router(body['name'], body['id'])
+        self.assertEqual(body['name'], router_name)
+        self.assertIsNotNone(nsx_router)
+        self.assertEqual(
+            nsx_router['allocation_profile']['enable_standby_relocation'],
+            True)
