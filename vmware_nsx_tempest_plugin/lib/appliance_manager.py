@@ -109,6 +109,9 @@ class ApplianceManager(manager.NetworkScenarioTest):
         elif CONF.network.backend == "nsxv":
             router = routers_client.create_router(
                 name=name, **kwargs)['router']
+        elif CONF.network.backend == "nsxp":
+            router = routers_client.create_router(
+                name=name, admin_state_up=True, tenant_id=tenant_id)['router']
         if set_gateway is not False:
             if kwargs.get("enable_snat") is not None:
                 public_network_info = {"external_gateway_info": dict(
