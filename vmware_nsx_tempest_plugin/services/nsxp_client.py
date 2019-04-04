@@ -399,3 +399,18 @@ class NSXPClient(object):
             return None
         lports = self.get_logical_ports(nsx_network)
         return self.get_nsx_resource_by_name(lports, os_name)
+
+    def get_port_qos_profile_binding_map(self, segment_id, port_id):
+        """
+        Get the qos profile associated with the port.
+
+        Return qos profile id if found, otherwise return None
+        """
+        if not segment_id or not port_id:
+            LOG.error("segment id and port id need to be "
+                      "present in order to query backend port QoS Profiles!")
+            return None
+        endpoint = "segments/%s/ports/%s/port-qos-profile-binding-maps" % (
+            segment_id, port_id)
+        response = self.get(endpoint)
+
