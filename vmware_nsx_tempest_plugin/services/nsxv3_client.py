@@ -304,12 +304,6 @@ class NSXV3Client(object):
         """
         return self.get_logical_resources("/logical-switches")
 
-    def get_logical_switch_profiles(self):
-        """
-        Retrieve all switching profiles on NSX backend
-        """
-        return self.get_logical_resources("/switching-profiles")
-
     def get_switching_profiles(self):
         """
         Retrieve all switching profiles on NSX backend
@@ -671,3 +665,19 @@ class NSXV3Client(object):
         :return: returns list of health monitors information.
         """
         return self.get_logical_resources("/loadbalancer/monitors")
+
+    def get_qos_profile(self, os_name, os_uuid):
+        """
+        Get the qos profile based on the name and uuid provided.
+
+        The name of the qos profile should follow
+            <os_qos_policy_name>_<first 5 os uuid>...<last 5 os uuid>
+        Return qos profile if found, otherwise return None
+        """
+        if not os_name or not os_uuid:
+            LOG.error("Name and uuid of OpenStack QoS policy need to be "
+                      "present in order to query backend QoS Profiles!")
+            return None
+        nsx_name = os_name + "_" + os_uuid[:5] + "..." + os_uuid[-5:]
+        qos_profiles = self.get_switching_profiles()
+        return self.get_nsx_resource_by_name(qos_profiles, nsx_name)
