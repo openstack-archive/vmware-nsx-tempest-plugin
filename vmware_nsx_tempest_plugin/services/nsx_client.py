@@ -37,12 +37,17 @@ class NSXClient(object):
                 firewall_section)
             return firewall_section, firewall_section_rules
         else:
-            #TODO(ddoshi) define else for nsxv
+            # TODO(ddoshi) define else for nsxv
             pass
 
     def get_bridge_cluster_info(self, *args, **kwargs):
         if self.backend == "nsxv3":
             return self.nsx.get_bridge_cluster_info(
+                *args, **kwargs)
+
+    def get_bridge_profile_info(self, *args, **kwargs):
+        if self.backend == "nsxv3":
+            return self.nsx.get_bridge_profile_info(
                 *args, **kwargs)
 
     def get_qos_switching_profile(self, policy_name):
@@ -52,11 +57,11 @@ class NSXClient(object):
         if self.backend == "nsxv3":
             qos_policies = self.nsx.get_switching_profiles()
             nsx_policy = self.nsx.get_nsx_resource_by_name(qos_policies,
-                policy_name)
+                                                           policy_name)
             qos_policy = self.nsx.get_switching_profile(nsx_policy['id'])
             return qos_policy
         else:
-            #TODO(dkandavarajay) define else for NSXV
+            # TODO(dkandavarajay) define else for NSXV
             pass
 
     def get_qos_bandwidth_rule(self, nsx_policy_id):
@@ -73,7 +78,7 @@ class NSXClient(object):
                     max_burst = cfg['burst_size_bytes']
                     return avg_bw, peak_bw, max_burst
         else:
-            #TODO(dkandavarajay) define else for NSXV
+            # TODO(dkandavarajay) define else for NSXV
             pass
 
     def get_qos_dscp_rule(self, nsx_policy_id):
@@ -85,7 +90,7 @@ class NSXClient(object):
             shaper_cfg = sw_profiles['dscp']
             return shaper_cfg['priority']
         else:
-            #TODO(dkandavarajay) define else for NSXV
+            # TODO(dkandavarajay) define else for NSXV
             pass
         return None
 

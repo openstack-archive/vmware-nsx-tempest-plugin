@@ -76,7 +76,10 @@ class L2GatewayTest(L2GatewayBase):
         bridge cluster UUID (device name) from NSX manager.
         """
         LOG.info("Testing l2_gateway_create api")
-        cluster_info = self.nsx_bridge_cluster_info()
+        if CONF.nsxv3.bridge_cluster:
+            cluster_info = self.nsx_bridge_cluster_info()
+        else:
+            cluster_info = self.nsx_bridge_profile_info()
         device_name, interface_name = cluster_info[0][0], cluster_info[0][1]
         l2gw_name = data_utils.rand_name(constants.L2GW)
         device_1 = {"dname": device_name, "iname": interface_name}
@@ -100,7 +103,10 @@ class L2GatewayTest(L2GatewayBase):
         bridge cluster UUID (device name) from NSX manager and vlan id.
         """
         LOG.info("Testing l2_gateway_create api with segmentation ID")
-        cluster_info = self.nsx_bridge_cluster_info()
+        if CONF.nsxv3.bridge_cluster:
+            cluster_info = self.nsx_bridge_cluster_info()
+        else:
+            cluster_info = self.nsx_bridge_profile_info()
         device_name, interface_name = cluster_info[0][0], cluster_info[0][1]
         l2gw_name = data_utils.rand_name(constants.L2GW)
         device_1 = {"dname": device_name, "iname": interface_name,
@@ -136,7 +142,10 @@ class L2GatewayTest(L2GatewayBase):
         bridge cluster UUID (device name) from NSX manager and vlan id.
         """
         LOG.info("Testing l2_gateway_create api with segmentation ID")
-        cluster_info = self.nsx_bridge_cluster_info()
+        if CONF.nsxv3.bridge_cluster:
+            cluster_info = self.nsx_bridge_cluster_info()
+        else:
+            cluster_info = self.nsx_bridge_profile_info()
         device_name, interface_name = cluster_info[0][0], cluster_info[0][1]
         l2gw_name = data_utils.rand_name(constants.L2GW)
         device_1 = {"dname": device_name, "iname": interface_name,
@@ -171,7 +180,10 @@ class L2GatewayTest(L2GatewayBase):
         delete l2gw we need l2gw id.
         """
         LOG.info("Testing l2_gateway_delete api")
-        cluster_info = self.nsx_bridge_cluster_info()
+        if CONF.nsxv3.bridge_cluster:
+            cluster_info = self.nsx_bridge_cluster_info()
+        else:
+            cluster_info = self.nsx_bridge_profile_info()
         device_name, interface_name = cluster_info[0][0], cluster_info[0][1]
         l2gw_name = data_utils.rand_name(constants.L2GW)
         device_1 = {"dname": device_name, "iname": interface_name}
@@ -200,7 +212,10 @@ class L2GatewayTest(L2GatewayBase):
         update l2gw we need l2gw id and payload to update.
         """
         LOG.info("Testing l2_gateway_update api")
-        cluster_info = self.nsx_bridge_cluster_info()
+        if CONF.nsxv3.bridge_cluster:
+            cluster_info = self.nsx_bridge_cluster_info()
+        else:
+            cluster_info = self.nsx_bridge_profile_info()
         device_name, interface_name = cluster_info[0][0], cluster_info[0][1]
         l2gw_name = data_utils.rand_name(constants.L2GW)
         device_1 = {"dname": device_name, "iname": interface_name}
@@ -241,7 +256,10 @@ class L2GatewayTest(L2GatewayBase):
         update l2gw we need l2gw id and payload to update.
         """
         LOG.info("Testing l2_gateway_update api")
-        cluster_info = self.nsx_bridge_cluster_info()
+        if CONF.nsxv3.bridge_cluster:
+            cluster_info = self.nsx_bridge_cluster_info()
+        else:
+            cluster_info = self.nsx_bridge_profile_info()
         device_name, interface_name = cluster_info[0][0], cluster_info[0][1]
         l2gw_name = data_utils.rand_name(constants.L2GW)
         device_1 = {"dname": device_name, "iname": interface_name}
@@ -283,7 +301,10 @@ class L2GatewayTest(L2GatewayBase):
         show l2gw based on UUID. To see l2gw info we need l2gw id.
         """
         LOG.info("Testing l2_gateway_show api")
-        cluster_info = self.nsx_bridge_cluster_info()
+        if CONF.nsxv3.bridge_cluster:
+            cluster_info = self.nsx_bridge_cluster_info()
+        else:
+            cluster_info = self.nsx_bridge_profile_info()
         device_name, interface_name = cluster_info[0][0], cluster_info[0][1]
         l2gw_name = data_utils.rand_name(constants.L2GW)
         device_1 = {"dname": device_name, "iname": interface_name,
@@ -325,7 +346,10 @@ class L2GatewayTest(L2GatewayBase):
         list created l2gw.
         """
         LOG.info("Testing l2_gateway_list api")
-        cluster_info = self.nsx_bridge_cluster_info()
+        if CONF.nsxv3.bridge_cluster:
+            cluster_info = self.nsx_bridge_cluster_info()
+        else:
+            cluster_info = self.nsx_bridge_profile_info()
         device_name, interface_name = cluster_info[0][0], cluster_info[0][1]
         l2gw_name = data_utils.rand_name(constants.L2GW)
         device_1 = {"dname": device_name, "iname": interface_name,

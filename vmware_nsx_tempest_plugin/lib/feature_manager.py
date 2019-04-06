@@ -451,6 +451,17 @@ class FeatureManager(traffic_manager.IperfManager,
             raise RuntimeError(_("NSX bridge cluster information is null"))
         return [(x.get("id"), x.get("display_name")) for x in response]
 
+    def nsx_bridge_profile_info(self):
+        """Collect the device and interface name of the nsx brdige profile.
+
+        :return: nsx bridge id and display name.
+
+        """
+        response = self.nsx_client.get_bridge_profile_info()
+        if len(response) == 0:
+            raise RuntimeError(_("NSX bridge profile information is null"))
+        return [(x.get("id"), x.get("display_name")) for x in response]
+
     def create_l2gw_connection(self, l2gwc_param):
         """Creates L2GWC and return the response.
 

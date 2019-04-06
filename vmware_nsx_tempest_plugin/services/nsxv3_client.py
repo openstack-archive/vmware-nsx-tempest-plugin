@@ -324,6 +324,14 @@ class NSXV3Client(object):
         """
         return self.get_logical_resources("/bridge-clusters")
 
+    def get_bridge_profile_info(self):
+        """
+        Get bridge profile information.
+
+        :return: returns bridge profile id and bridge profile name.
+        """
+        return self.get_logical_resources("/bridge-endpoint-profiles")
+
     def get_logical_switch(self, os_name, os_uuid):
         """
         Get the logical switch based on the name and uuid provided.
