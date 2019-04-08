@@ -285,3 +285,22 @@ class LBaasRoundRobinBaseTest(feature_manager.FeatureManager):
         self.assertRaises(exceptions.BadRequest, self.remove_router_interface,
                           lb_topo.get('router')['id'],
                           lb_topo.get('subnet')['id'])
+
+    @decorators.attr(type='nsxv3')
+    @decorators.idempotent_id('60e9ecaf-b8d6-48a9-b0d2-942e5bb38f38')
+    def test_lbaas_http_round_robin_with_session_persistence(self):
+        """
+        To verify the server count for LB pool with SOURCE_IP
+        session persistence and ROUND_ROBIN lb-algorithm
+        expected outcome is only one server responds to the
+        client requests
+        """
+        self.deploy_lbaas_topology()
+        if not CONF.nsxv3.ens:
+            self.start_web_servers(constants.HTTP_PORT)
+        self.create_project_lbaas(protocol_type="HTTP", protocol_port="80",
+                                  lb_algorithm="ROUND_ROBIN",
+                                  hm_type='PING', persistence=True,
+                                  persistence_type="SOURCE_IP")
+        self.check_lbaas_project_weight_values(constants.NO_OF_VMS_2,
+                                               persistence=True)
