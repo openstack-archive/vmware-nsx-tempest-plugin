@@ -623,7 +623,8 @@ class FeatureManager(traffic_manager.IperfManager,
 
     def check_lbaas_project_weight_values(self, count=2, HTTPS=None,
                                           member_count=None,
-                                          barbican_http=None):
+                                          barbican_http=None,
+                                          persistence=False):
         vip = self.vip_ip_address
         time.sleep(constants.SLEEP_BETWEEN_VIRTUAL_SEREVRS_OPEARTIONS)
         if HTTPS is None:
@@ -640,34 +641,44 @@ class FeatureManager(traffic_manager.IperfManager,
                 pass
         elif barbican_http:
             no_of_vms = len(self.http_cnt)
-            if no_of_vms:
-                if (self.http_cnt['server_lbaas_2'] <
-                        (self.poke_counters / no_of_vms)):
-                    self.assertGreater(self.http_cnt['server_lbaas_3'],
-                                       self.poke_counters / no_of_vms)
-                elif (self.http_cnt['server_lbaas_3'] >
-                        (self.poke_counters / no_of_vms)):
-                    self.assertLess(self.http_cnt['server_lbaas_3'],
-                                    self.poke_counters / no_of_vms)
-                else:
-                    self.assertEqual(self.http_cnt['server_lbaas_3'],
-                                     self.poke_counters / no_of_vms,
-                                     "LB fails with weighted values")
+            # if source_ip persistence enabled then the count
+            # remains 1 as only one server will be actively responding
+            if  persistence:
+                self.assertEqual(no_of_vms, 1)
+            else:
+                if no_of_vms:
+                    if (self.http_cnt['server_lbaas_2'] <
+                            (self.poke_counters / no_of_vms)):
+                        self.assertGreater(self.http_cnt['server_lbaas_3'],
+                                           self.poke_counters / no_of_vms)
+                    elif (self.http_cnt['server_lbaas_3'] >
+                            (self.poke_counters / no_of_vms)):
+                        self.assertLess(self.http_cnt['server_lbaas_3'],
+                                        self.poke_counters / no_of_vms)
+                    else:
+                        self.assertEqual(self.http_cnt['server_lbaas_3'],
+                                         self.poke_counters / no_of_vms,
+                                         "LB fails with weighted values")
         else:
             no_of_vms = len(self.http_cnt)
-            if no_of_vms:
-                if (self.http_cnt['server_lbaas_0'] <
-                        (self.poke_counters / no_of_vms)):
-                    self.assertGreater(self.http_cnt['server_lbaas_1'],
-                                       self.poke_counters / no_of_vms)
-                elif (self.http_cnt['server_lbaas_0'] >
-                        (self.poke_counters / no_of_vms)):
-                    self.assertLess(self.http_cnt['server_lbaas_1'],
-                                    self.poke_counters / no_of_vms)
-                else:
-                    self.assertEqual(self.http_cnt['server_lbaas_1'],
-                                     self.poke_counters / no_of_vms,
-                                     "LB fails with weighted values")
+            # if source_ip persistence enabled then the count
+            # remains 1 as only one server will be actively responding
+            if persistence:
+                self.assertEqual(no_of_vms, 1)
+            else:
+                if no_of_vms:
+                    if (self.http_cnt['server_lbaas_0'] <
+                            (self.poke_counters / no_of_vms)):
+                        self.assertGreater(self.http_cnt['server_lbaas_1'],
+                                           self.poke_counters / no_of_vms)
+                    elif (self.http_cnt['server_lbaas_0'] >
+                            (self.poke_counters / no_of_vms)):
+                        self.assertLess(self.http_cnt['server_lbaas_1'],
+                                        self.poke_counters / no_of_vms)
+                    else:
+                        self.assertEqual(self.http_cnt['server_lbaas_1'],
+                                         self.poke_counters / no_of_vms,
+                                         "LB fails with weighted values")
 
     def check_project_lbaas(self, count=2, HTTPS=None):
         i = 0
@@ -714,9 +725,17 @@ class FeatureManager(traffic_manager.IperfManager,
                              pool_protocol=None, pool_port=None,
                              vip_subnet_id=None, barbican_container=None,
                              lb_id=None, count=None,
-                             clean_up=None):
+                             clean_up=None, persistence=False,
+                             persistence_cookie_name=None,
+                             persistence_type=None):
         count = 0
         lb_name = None
+        session_persistence = {}
+        if persistence:
+            if persistence_type:
+                session_persistence["type"] = persistence_type
+            if persistence_cookie_name:
+                session_persistence["cookie_name"] = persistence_cookie_name
         if vip_subnet_id is None:
             vip_subnet_id = self.topology_subnets["subnet_lbaas_1"]['id']
         if lb_id is None:
@@ -766,12 +785,14 @@ class FeatureManager(traffic_manager.IperfManager,
                 self.pool = self.pools_admin_client.create_pool(
                     listener_id=self.listener['id'],
                     lb_algorithm=lb_algorithm, protocol=pool_protocol,
-                    name=lb_name)['pool']
+                    name=lb_name,
+                    session_persistence=session_persistence)['pool']
             else:
                 self.pool = self.pools_admin_client.create_pool(
                     listener_id=self.listener['id'],
                     lb_algorithm=lb_algorithm, protocol=pool_protocol,
-                    name=lb_id)['pool']
+                    name=lb_id,
+                    session_persistence=session_persistence)['pool']
             self.load_balancers_admin_client.wait_for_load_balancer_status(
                 lb_id)
             pool_id = self.pool['id']
@@ -783,7 +804,8 @@ class FeatureManager(traffic_manager.IperfManager,
             self.pool = self.pools_client.create_pool(
                 listener_id=self.listener['id'],
                 lb_algorithm=lb_algorithm, protocol=protocol_type,
-                name=lb_name)['pool']
+                name=lb_name,
+                session_persistence=session_persistence)['pool']
             self.wait_for_load_balancer_status(lb_id)
         pool_id = self.pool['id']
 
