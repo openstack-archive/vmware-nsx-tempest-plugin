@@ -96,7 +96,8 @@ class ApplianceManager(manager.NetworkScenarioTest):
         return self.topology_keypairs[server['key_name']]['private_key']
 
     def create_topology_router(self, router_name, routers_client=None,
-                               tenant_id=None, set_gateway=True, **kwargs):
+                               tenant_id=None, set_gateway=True, ext_netid=None,
+                               **kwargs):
         if not routers_client:
             routers_client = self.routers_client
         if not tenant_id:
@@ -113,13 +114,17 @@ class ApplianceManager(manager.NetworkScenarioTest):
             router = routers_client.create_router(
                 name=name, admin_state_up=True, tenant_id=tenant_id)['router']
         if set_gateway is not False:
+            if not ext_netid:
+                external_network_id = self.topology_public_network_id
+            else:
+                external_network_id = ext_netid
             if kwargs.get("enable_snat") is not None:
                 public_network_info = {"external_gateway_info": dict(
-                    network_id=self.topology_public_network_id,
+                    network_id=external_network_id,
                     enable_snat=kwargs["enable_snat"])}
             else:
                 public_network_info = {"external_gateway_info": dict(
-                    network_id=self.topology_public_network_id)}
+                    network_id=external_network_id)}
             routers_client.update_router(router['id'], **public_network_info)
         self.topology_routers[router_name] = router
         if CONF.nsxv3.ens:
@@ -167,6 +172,13 @@ class ApplianceManager(manager.NetworkScenarioTest):
         if not routers_client:
             routers_client = self.routers_client
         routers_client.delete_router(router_id)
+
+    def show_topology_router(
+            self, router_id, routers_client=None):
+        if not routers_client:
+            routers_client = self.routers_client
+        result = routers_client.show_router(router_id)
+        return result
 
     def create_topology_network(
             self, network_name, networks_client=None,
