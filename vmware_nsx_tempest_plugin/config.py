@@ -199,7 +199,11 @@ NSXv3Group = [
     cfg.BoolOpt('ens',
                 default=False,
                 help="enable ens based changes like port-security-disabled"
-                     " no security-group"),
+                     " no security-group"),,
+    cfg.BoolOpt('bridge_cluster',
+                default=False,
+                help="Use Bridge ESXi based cluster id or Bridge Edge Endpoint"
+                     " profile"),
 ]
 
 dns_group = cfg.OptGroup(name='dns',
