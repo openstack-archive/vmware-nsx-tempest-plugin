@@ -303,4 +303,30 @@ class LBaasRoundRobinBaseTest(feature_manager.FeatureManager):
                                   hm_type='PING', persistence=True,
                                   persistence_type="SOURCE_IP")
         self.check_lbaas_project_weight_values(constants.NO_OF_VMS_2,
-                                               persistence=True)
+                                               hash_persistence=True)
+
+    @decorators.attr(type='nsxv3')
+    @decorators.idempotent_id('60e9adda-b8d6-48a9-b0d2-942e5bb38f38')
+    def test_lbaas_http_update_app_cookie_http_cookie_persistence(self):
+        """
+        To verify the updation of session persistence from APP_COOKIE to
+        HTTP_COOKIE works fine.
+        """
+        self.deploy_lbaas_topology()
+        if not CONF.nsxv3.ens:
+            self.start_web_servers(constants.HTTP_PORT)
+        self.create_project_lbaas(protocol_type="HTTP", protocol_port="80",
+                                  lb_algorithm="ROUND_ROBIN",
+                                  hm_type='PING', persistence=True,
+                                  persistence_type="APP_COOKIE",
+                                  persistence_cookie_name="application_cookie")
+        self.check_lbaas_project_weight_values(constants.NO_OF_VMS_2)
+        pool_id = self.pools_client.list_pools()['pools'][-1]['id']
+        session_persistence = {}
+        session_persistence['type'] = "HTTP_COOKIE"
+        self.pools_client.update_pool(pool_id=pool_id,
+                                      session_persistence=session_persistence)
+        get_pool = self.pools_client.list_pools()
+        updated_pool = get_pool['pools'][0]['session_persistence']['type']
+        self.assertEqual("HTTP_COOKIE", updated_pool)
+        self.check_lbaas_project_weight_values(constants.NO_OF_VMS_2)
