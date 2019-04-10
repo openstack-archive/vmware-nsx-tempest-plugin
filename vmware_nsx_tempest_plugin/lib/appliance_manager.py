@@ -63,19 +63,37 @@ class ApplianceManager(manager.NetworkScenarioTest):
 
     def _verify_empty_security_group_status(self, security_group):
         ip_protocols = ["IPV6", "IPV4"]
-        nsx_fw_section, nsx_fw_section_rules = \
-            self.nsx_client.get_firewall_section_and_rules(
-                security_group['name'], security_group['id'])
-        msg = "Newly created empty security group does not meet criteria !!!"
-        self.assertEqual(nsx_fw_section["rule_count"], 2, msg)
-        self.assertEqual(nsx_fw_section_rules[0]["action"], "ALLOW", msg)
-        self.assertEqual(nsx_fw_section_rules[1]["action"], "ALLOW", msg)
-        self.assertEqual(nsx_fw_section_rules[0]["direction"], "OUT", msg)
-        self.assertEqual(nsx_fw_section_rules[1]["direction"], "OUT", msg)
-        self.assertIn(nsx_fw_section_rules[0]["ip_protocol"], ip_protocols,
-                      msg)
-        self.assertIn(nsx_fw_section_rules[1]["ip_protocol"], ip_protocols,
-                      msg)
+        if CONF.network.backend == 'nsxp':
+            nsx_fw_section, nsx_fw_section_rules = \
+                self.nsx_client.get_firewall_section_and_rules(
+                    security_group['name'], security_group['id'],
+                    os_tenant_id=security_group['tenant_id'])
+            msg = "Newly created empty security" \
+                  " group does not meet criteria !!!"
+            self.assertEqual(len(nsx_fw_section_rules), 2, msg)
+            self.assertEqual(nsx_fw_section_rules[0]["action"], "ALLOW", msg)
+            self.assertEqual(nsx_fw_section_rules[1]["action"], "ALLOW", msg)
+            self.assertEqual(nsx_fw_section_rules[0]["direction"], "OUT", msg)
+            self.assertEqual(nsx_fw_section_rules[1]["direction"], "OUT", msg)
+            self.assertIn(nsx_fw_section_rules[0]["ip_protocol"], ip_protocols,
+                          msg)
+            self.assertIn(nsx_fw_section_rules[1]["ip_protocol"], ip_protocols,
+                          msg)
+        else:
+            nsx_fw_section, nsx_fw_section_rules = \
+                self.nsx_client.get_firewall_section_and_rules(
+                    security_group['name'], security_group['id'])
+            msg = "Newly created empty security" \
+                  " group does not meet criteria !!!"
+            self.assertEqual(nsx_fw_section["rule_count"], 2, msg)
+            self.assertEqual(nsx_fw_section_rules[0]["action"], "ALLOW", msg)
+            self.assertEqual(nsx_fw_section_rules[1]["action"], "ALLOW", msg)
+            self.assertEqual(nsx_fw_section_rules[0]["direction"], "OUT", msg)
+            self.assertEqual(nsx_fw_section_rules[1]["direction"], "OUT", msg)
+            self.assertIn(nsx_fw_section_rules[0]["ip_protocol"], ip_protocols,
+                          msg)
+            self.assertIn(nsx_fw_section_rules[1]["ip_protocol"], ip_protocols,
+                          msg)
 
     def create_topology_empty_security_group(self, namestart="vmw_"):
         security_group = self._create_empty_security_group(namestart=namestart)
