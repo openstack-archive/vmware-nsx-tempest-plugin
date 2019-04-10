@@ -356,3 +356,46 @@ class NSXPClient(object):
         endpoint = "/logical-routers/%s/routing/advertisement" % lrouter['id']
         response = self.get(endpoint)
         return response.json()
+
+    def get_qos_profiles(self):
+        """
+        Get all user defined qos-profiles
+        """
+        endpoint = "qos-profiles"
+        return self.get_logical_resources(endpoint)
+
+    def get_qos_profile(self, os_name, os_uuid):
+        """
+        Get the qos-profile based on the name and uuid provided.
+
+        The name of the qos-profile should follow
+            <os_network_name>_<first 5 os uuid>...<last 5 os uuid>
+        Return qos-profile if found, otherwise return None
+        """
+        if not os_name or not os_uuid:
+            LOG.error("Name and uuid of Openstack qos-profile need to be "
+                      "present in order to query backend qos-profile!")
+            return None
+        nsx_name = os_name + "_" + os_uuid[:5] + "..." + os_uuid[-5:]
+        qos_profile = self.get_qos_profiles()
+        return self.get_nsx_resource_by_name(qos_profile, nsx_name)
+
+    def get_logical_ports(self, nsx_network):
+        """
+        Retrieve all logical ports of segments on NSX backend
+        """
+        return self.get_logical_resources(
+            "segments/%s/ports" % nsx_network['id'])
+
+    def get_logical_port(self, os_name, nsx_network):
+        """
+        Get the logical port based on the os_name provided.
+        The name of the logical port shoud match the os_name.
+        Return the logical port if found, otherwise return None.
+        """
+        if not os_name:
+            LOG.error("Name of OS port should be present "
+                      "in order to query backend logical port created")
+            return None
+        lports = self.get_logical_ports(nsx_network)
+        return self.get_nsx_resource_by_name(lports, os_name)
