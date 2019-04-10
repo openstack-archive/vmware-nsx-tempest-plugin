@@ -24,6 +24,7 @@ from tempest.lib import decorators
 
 from vmware_nsx_tempest_plugin.common import constants
 from vmware_nsx_tempest_plugin.services import nsxv3_client
+from vmware_nsx_tempest_plugin.services import nsxp_client
 from vmware_nsx_tempest_plugin.tests.scenario import manager
 
 CONF = config.CONF
@@ -57,6 +58,9 @@ class TestNSXv3PortSecurityScenario(manager.NetworkScenarioTest):
         cls.nsx = nsxv3_client.NSXV3Client(CONF.nsxv3.nsx_manager,
                                            CONF.nsxv3.nsx_user,
                                            CONF.nsxv3.nsx_password)
+        cls.nsxp = nsxp_client.NSXPClient(CONF.nsxv3.nsx_manager,
+                                          CONF.nsxv3.nsx_user,
+                                          CONF.nsxv3.nsx_password)
 
     def setUp(self):
         super(TestNSXv3PortSecurityScenario, self).setUp()
@@ -263,8 +267,12 @@ class TestNSXv3PortSecurityScenario(manager.NetworkScenarioTest):
         kwargs = {"port_security_enabled": "false", "security_groups": []}
         port_client.update_port(port_id['port']['id'], **kwargs)
         time.sleep(constants.NSX_BACKEND_SMALL_TIME_INTERVAL)
-        nsgroup_id = self.nsx.get_neutron_ns_group_id()
-        nsxgroup_data = self.nsx.get_ns_group_port_members(nsgroup_id)
+        if CONF.nsxv3.backend == 'nsxp':
+            nsgroup_id = self.nsxp.get_neutron_ns_group_id()
+            nsxgroup_data = self.nsxp.get_ns_group_port_members(nsgroup_id)
+        else:
+            nsgroup_id = self.nsx.get_neutron_ns_group_id()
+            nsxgroup_data = self.nsx.get_ns_group_port_members(nsgroup_id)
         instance = "instance-port_%s" % port_id['port']['id'][0:4]
         for nsxgroup in nsxgroup_data['results']:
             if instance in nsxgroup['target_display_name']:
@@ -273,8 +281,12 @@ class TestNSXv3PortSecurityScenario(manager.NetworkScenarioTest):
         kwargs = {"port_security_enabled": "true"}
         port_client.update_port(port_id['port']['id'], **kwargs)
         time.sleep(constants.NSX_BACKEND_TIME_INTERVAL)
-        nsgroup_id = self.nsx.get_neutron_ns_group_id()
-        nsxgroup_data = self.nsx.get_ns_group_port_members(nsgroup_id)
+        if CONF.nsxv3.backend == 'nsxp':
+            nsgroup_id = self.nsxp.get_neutron_ns_group_id()
+            nsxgroup_data = self.nsxp.get_ns_group_port_members(nsgroup_id)
+        else:
+            nsgroup_id = self.nsx.get_neutron_ns_group_id()
+            nsxgroup_data = self.nsx.get_ns_group_port_members(nsgroup_id)
         time.sleep(constants.NSX_BACKEND_SMALL_TIME_INTERVAL)
         for nsxgroup in nsxgroup_data['results']:
             if instance in nsxgroup['target_display_name']:
@@ -367,8 +379,12 @@ class TestNSXv3PortSecurityScenario(manager.NetworkScenarioTest):
         sec_group = sec_grp_port['port']['security_groups'][0]
         port_client.update_port(port_id, **kwargs)
         time.sleep(constants.NSX_BACKEND_TIME_INTERVAL)
-        nsgroup_id = self.nsx.get_neutron_ns_group_id()
-        nsxgroup_data = self.nsx.get_ns_group_port_members(nsgroup_id)
+        if CONF.nsxv3.backend == 'nsxp':
+            nsgroup_id = self.nsxp.get_neutron_ns_group_id()
+            nsxgroup_data = self.nsxp.get_ns_group_port_members(nsgroup_id)
+        else:
+            nsgroup_id = self.nsx.get_neutron_ns_group_id()
+            nsxgroup_data = self.nsx.get_ns_group_port_members(nsgroup_id)
         time.sleep(constants.NSX_BACKEND_SMALL_TIME_INTERVAL)
         instance = "instance-port_%s" % port_id[0:4]
         for nsxgroup in nsxgroup_data['results']:
@@ -379,8 +395,12 @@ class TestNSXv3PortSecurityScenario(manager.NetworkScenarioTest):
                   "security_groups": [sec_group]}
         port_client.update_port(port_id, **kwargs)
         time.sleep(constants.NSX_BACKEND_TIME_INTERVAL)
-        nsgroup_id = self.nsx.get_neutron_ns_group_id()
-        nsxgroup_data = self.nsx.get_ns_group_port_members(nsgroup_id)
+        if CONF.nsxv3.backend == 'nsxp':
+            nsgroup_id = self.nsxp.get_neutron_ns_group_id()
+            nsxgroup_data = self.nsxp.get_ns_group_port_members(nsgroup_id)
+        else:
+            nsgroup_id = self.nsx.get_neutron_ns_group_id()
+            nsxgroup_data = self.nsx.get_ns_group_port_members(nsgroup_id)
         time.sleep(constants.NSX_BACKEND_SMALL_TIME_INTERVAL)
         for nsxgroup in nsxgroup_data['results']:
             if instance in nsxgroup['target_display_name']:

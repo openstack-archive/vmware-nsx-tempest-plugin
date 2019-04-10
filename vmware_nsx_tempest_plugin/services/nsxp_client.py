@@ -252,14 +252,14 @@ class NSXPClient(object):
         """
         return self.get_logical_resources("domains/%s/groups" % tenant_id)
 
-    def get_firewall_sections(self, tenant_id=None):
+    def get_firewall_sections(self, tenant_id):
         """
         Retrieve all firewall sections
         """
         return self.get_logical_resources("domains/%s/security-policies" %
                                           tenant_id)
 
-    def get_firewall_section(self, os_name, os_uuid, os_tenant_id=None):
+    def get_firewall_section(self, os_name, os_uuid, os_tenant_id):
         """
         Get the firewall section by os_name and os_uuid
         """
@@ -276,22 +276,22 @@ class NSXPClient(object):
                 constants.NSX_FIREWALL_REALIZED_TIMEOUT and \
                 not nsx_dfw_section:
             nsx_firewall_time_counter += 1
-            fw_sections = self.get_firewall_sections(tenant_id=os_tenant_id)
+            fw_sections = self.get_firewall_sections(os_tenant_id)
             nsx_dfw_section = self.get_nsx_resource_by_name(fw_sections,
                                                             nsx_name)
             time.sleep(constants.ONE_SEC)
         return nsx_dfw_section
 
-    def get_firewall_section_rules(self, fw_section, tenant_id=None):
+    def get_firewall_section_rules(self, fw_section, os_tenant_id):
         """
         Retrieve all fw rules for a given fw section
         """
         endpoint = "domains/%s/security-policies/%s/rules" % \
-            (tenant_id, fw_section['id'])
+            (os_tenant_id, fw_section['id'])
         return self.get_logical_resources(endpoint)
 
     def get_firewall_section_rule(self, fw_section, os_uuid,
-                                  os_tenant_id=None):
+                                  os_tenant_id):
         """
         Get the firewall section rule based on the name
         """
@@ -299,7 +299,7 @@ class NSXPClient(object):
         nsx_name = os_uuid
         return self.get_nsx_resource_by_name(fw_rules, nsx_name)
 
-    def get_ns_group(self, os_name, os_uuid, os_tenant_id=None):
+    def get_ns_group(self, os_name, os_uuid, os_tenant_id):
         """
         Get the NSGroup based on the name provided.
         The name of the nsgroup should follow
@@ -311,7 +311,7 @@ class NSXPClient(object):
                       "present in order to query backend nsgroup created")
             return None
         nsx_name = os_name + "_" + os_uuid[:5] + "..." + os_uuid[-5:]
-        nsgroups = self.get_ns_groups(tenant_id=os_tenant_id)
+        nsgroups = self.get_ns_groups(os_tenant_id)
         return self.get_nsx_resource_by_name(nsgroups, nsx_name)
 
     def get_logical_switches(self):
@@ -399,3 +399,23 @@ class NSXPClient(object):
             return None
         lports = self.get_logical_ports(nsx_network)
         return self.get_nsx_resource_by_name(lports, os_name)
+
+    def get_neutron_ns_group_id(self):
+        """
+        Retrieve NSGroup Id
+        """
+        nsx_nsgroup = self.get_ns_groups('default')
+        for group in nsx_nsgroup:
+            if group['display_name'] == 'neutron_excluded_ports_group':
+                nsgroup_id = group['id']
+                return nsgroup_id
+
+    def get_ns_group_port_members(self, ns_group_id, os_tenant_id):
+        """
+        Retrieve NSGroup port members
+        """
+        endpoint = "domains/%s/groups/%s/members/logical-ports" % (
+            os_tenant_id, ns_group_id)
+        response = self.get(endpoint=endpoint)
+        res_json = response.json()
+        return res_json

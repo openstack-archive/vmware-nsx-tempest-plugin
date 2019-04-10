@@ -24,6 +24,7 @@ from tempest.lib import exceptions
 from tempest import test
 from vmware_nsx_tempest_plugin.common import constants
 from vmware_nsx_tempest_plugin.services import nsxv3_client
+from vmware_nsx_tempest_plugin.services import nsxp_client
 
 CONF = config.CONF
 
@@ -57,6 +58,9 @@ class NSXv3PortSecurity(base.BaseAdminNetworkTest):
         cls.nsx = nsxv3_client.NSXV3Client(CONF.nsxv3.nsx_manager,
                                            CONF.nsxv3.nsx_user,
                                            CONF.nsxv3.nsx_password)
+        cls.nsxp = nsxp_client.NSXPClient(CONF.nsxv3.nsx_manager,
+                                          CONF.nsxv3.nsx_user,
+                                          CONF.nsxv3.nsx_password)
         cls.network = cls.create_network()
 
     def get_tag_port_id(self, nsxgroup_data, org_port_id):
@@ -256,8 +260,13 @@ class NSXv3PortSecurity(base.BaseAdminNetworkTest):
                                 **kwargs)
         # Sleep for 10 sec
         time.sleep(constants.NSX_BACKEND_SMALL_TIME_INTERVAL)
-        nsgroup_id = self.nsx.get_neutron_ns_group_id()
-        nsxgroup_data = self.nsx.get_ns_group_port_members(nsgroup_id)
+        if CONF.network.backend == 'nsxp':
+            nsgroup_id = self.nsxp.get_neutron_ns_group_id()
+            nsxgroup_data = self.nsxp.get_ns_group_port_members(nsgroup_id,
+                                                                'default')
+        else:
+            nsgroup_id = self.nsx.get_neutron_ns_group_id()
+            nsxgroup_data = self.nsx.get_ns_group_port_members(nsgroup_id)
         corresponding_port_id = self.get_tag_port_id(nsxgroup_data,
                                                      org_port_id)
         # Sleep for 10 sec
@@ -269,8 +278,13 @@ class NSXv3PortSecurity(base.BaseAdminNetworkTest):
                   "security_groups": [secgroup_id]}
         port_client.update_port(org_port_id, **kwargs)
         time.sleep(constants.NSX_BACKEND_TIME_INTERVAL)
-        nsgroup_id = self.nsx.get_neutron_ns_group_id()
-        nsxgroup_data = self.nsx.get_ns_group_port_members(nsgroup_id)
+        if CONF.network.backend == 'nsxp':
+            nsgroup_id = self.nsxp.get_neutron_ns_group_id()
+            nsxgroup_data = self.nsxp.get_ns_group_port_members(nsgroup_id,
+                                                                'default')
+        else:
+            nsgroup_id = self.nsx.get_neutron_ns_group_id()
+            nsxgroup_data = self.nsx.get_ns_group_port_members(nsgroup_id)
         status = self.check_port_not_exists_in_os_group(nsxgroup_data,
                                                         corresponding_port_id)
         self.assertEqual(False, status)

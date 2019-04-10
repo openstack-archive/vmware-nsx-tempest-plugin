@@ -15,6 +15,7 @@
 from oslo_log import log as logging
 
 from vmware_nsx_tempest_plugin.services import nsxv3_client
+from vmware_nsx_tempest_plugin.services import nsxp_client
 
 LOG = logging.getLogger(__name__)
 
@@ -28,6 +29,8 @@ class NSXClient(object):
         self.password = password
         if backend.lower() == "nsxv3":
             self.nsx = nsxv3_client.NSXV3Client(host, username, password)
+        elif backend.lower() == "nsxp":
+            self.nsx = nsxp_client.NSXPClient(host, username, password)
 
     def get_firewall_section_and_rules(self, *args, **kwargs):
         if self.backend == "nsxv3":
@@ -35,6 +38,12 @@ class NSXClient(object):
                 *args, **kwargs)
             firewall_section_rules = self.nsx.get_firewall_section_rules(
                 firewall_section)
+            return firewall_section, firewall_section_rules
+        elif self.backend == "nsxp":
+            firewall_section = self.nsx.get_firewall_section(
+                *args, **kwargs)
+            firewall_section_rules = self.nsx.get_firewall_section_rules(
+                firewall_section, kwargs['os_tenant_id'])
             return firewall_section, firewall_section_rules
         else:
             # TODO(ddoshi) define else for nsxv
