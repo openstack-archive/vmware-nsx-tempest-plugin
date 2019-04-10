@@ -624,7 +624,7 @@ class FeatureManager(traffic_manager.IperfManager,
     def check_lbaas_project_weight_values(self, count=2, HTTPS=None,
                                           member_count=None,
                                           barbican_http=None,
-                                          persistence=False):
+                                          hash_persistence=False):
         vip = self.vip_ip_address
         time.sleep(constants.SLEEP_BETWEEN_VIRTUAL_SEREVRS_OPEARTIONS)
         if HTTPS is None:
@@ -643,7 +643,7 @@ class FeatureManager(traffic_manager.IperfManager,
             no_of_vms = len(self.http_cnt)
             # if source_ip persistence enabled then the count
             # remains 1 as only one server will be actively responding
-            if persistence:
+            if hash_persistence:
                 self.assertEqual(no_of_vms, 1)
             else:
                 if no_of_vms:
@@ -663,7 +663,7 @@ class FeatureManager(traffic_manager.IperfManager,
             no_of_vms = len(self.http_cnt)
             # if source_ip persistence enabled then the count
             # remains 1 as only one server will be actively responding
-            if persistence:
+            if hash_persistence:
                 self.assertEqual(no_of_vms, 1)
             else:
                 if no_of_vms:
