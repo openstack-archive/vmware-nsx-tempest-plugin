@@ -13,6 +13,8 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
+import time
+
 from oslo_log import log as logging
 
 from tempest.api.network import base
@@ -21,6 +23,8 @@ from tempest.lib.common.utils import data_utils
 from tempest.lib import decorators
 from tempest import test
 
+from vmware_nsx_tempest_plugin.common import constants
+from vmware_nsx_tempest_plugin.services import nsxp_client
 from vmware_nsx_tempest_plugin.services import nsxv3_client
 
 CONF = config.CONF
@@ -56,6 +60,9 @@ class NSXv3FloatingIPTest(base.BaseNetworkTest):
         cls.nsx = nsxv3_client.NSXV3Client(CONF.nsxv3.nsx_manager,
                                            CONF.nsxv3.nsx_user,
                                            CONF.nsxv3.nsx_password)
+        cls.nsxp = nsxp_client.NSXPClient(CONF.nsxv3.nsx_manager,
+                                          CONF.nsxv3.nsx_user,
+                                          CONF.nsxv3.nsx_password)
 
     @decorators.attr(type='nsxv3')
     @decorators.idempotent_id('593e4e51-9ea2-445b-b789-eff2b0b7a503')
@@ -69,6 +76,31 @@ class NSXv3FloatingIPTest(base.BaseNetworkTest):
         LOG.debug("Port IP address: %s", port_ip)
         self.addCleanup(self.floating_ips_client.delete_floatingip,
                         fip['id'])
+        if CONF.network.backend == 'nsxp':
+            time.sleep(constants.NSXP_BACKEND_SMALL_TIME_INTERVAL)
+            nsx_router_policy = self.nsxp.get_logical_router(
+                self.router['name'], self.router['id'])
+            LOG.debug("NSX policy router on backend: %s", nsx_router_policy)
+            nat_rules_policy = self.nsxp.get_logical_router_nat_rules(
+                nsx_router_policy)
+            LOG.debug("NAT rules on NSX router %(router)s: %(rules)s",
+                      {'router': nsx_router_policy,
+                       'rules': nat_rules_policy})
+            dnat_rules_policy = [(rule['translated_network'],
+                                  rule['destination_network'])
+                                 for rule in nat_rules_policy
+                                 if rule['action'] == 'DNAT']
+            snat_rules_policy = [(rule['translated_network'],
+                                  rule['source_network'])
+                                 for rule in nat_rules_policy
+                                 if 'source_network' in rule]
+            LOG.debug("snat_rules: %(snat)s; dnat_rules: %(dnat)s",
+                      {'snat': snat_rules_policy,
+                       'dnat': dnat_rules_policy})
+            self.assertIn((fip['floating_ip_address'], port_ip),
+                          snat_rules_policy)
+            self.assertIn((port_ip, fip['floating_ip_address']),
+                          dnat_rules_policy)
         nsx_router = self.nsx.get_logical_router(self.router['name'],
                                                  self.router['id'])
         LOG.debug("NSX router on backend: %s", nsx_router)
@@ -102,10 +134,37 @@ class NSXv3FloatingIPTest(base.BaseNetworkTest):
                   {'port1': port1_ip, 'port2': port2_ip})
         self.addCleanup(self.floating_ips_client.delete_floatingip,
                         fip['id'])
-        nsx_router = self.nsx.get_logical_router(self.router['name'],
-                                                 self.router['id'])
         self.assertEqual(fip['fixed_ip_address'], port1_ip)
         self.assertEqual(fip['router_id'], self.router['id'])
+        update_body = self.floating_ips_client.update_floatingip(
+            fip['id'], port_id=self.ports[1]['id'])
+        updated_fip = update_body['floatingip']
+        if CONF.network.backend == 'nsxp':
+            time.sleep(constants.NSXP_BACKEND_SMALL_TIME_INTERVAL)
+            nsx_router_policy = self.nsxp.get_logical_router(
+                self.router['name'], self.router['id'])
+            LOG.debug("NSX policy router on backend: %s", nsx_router_policy)
+            nat_rules_policy = self.nsxp.get_logical_router_nat_rules(
+                nsx_router_policy)
+            LOG.debug("NAT rules on NSX router %(router)s: %(rules)s",
+                      {'router': nsx_router_policy, 'rules': nat_rules_policy})
+            dnat_rules_policy = [(rule['translated_network'],
+                                  rule['destination_network'])
+                                 for rule in nat_rules_policy
+                                 if rule['action'] == 'DNAT']
+            snat_rules_policy = [(rule['translated_network'],
+                                  rule['source_network'])
+                                 for rule in nat_rules_policy
+                                 if 'source_network' in rule]
+            LOG.debug("snat_rules: %(snat)s; dnat_rules: %(dnat)s",
+                      {'snat': snat_rules_policy,
+                       'dnat': dnat_rules_policy})
+            self.assertIn((updated_fip['floating_ip_address'], port2_ip),
+                          snat_rules_policy)
+            self.assertIn((port2_ip, updated_fip['floating_ip_address']),
+                          dnat_rules_policy)
+        nsx_router = self.nsx.get_logical_router(self.router['name'],
+                                                 self.router['id'])
         # Update the floating ip
         update_body = self.floating_ips_client.update_floatingip(
             fip['id'], port_id=self.ports[1]['id'])
@@ -139,12 +198,36 @@ class NSXv3FloatingIPTest(base.BaseNetworkTest):
         fip = create_body['floatingip']
         port_ip = self.ports[0]['fixed_ips'][0]['ip_address']
         LOG.debug("Port IP address: %s", port_ip)
-        nsx_router = self.nsx.get_logical_router(self.router['name'],
-                                                 self.router['id'])
-        LOG.debug("NSX router on backend: %s", nsx_router)
         self.assertIsNotNone(fip['id'])
         # Delete the floating ip and backend nat rules
         self.floating_ips_client.delete_floatingip(fip['id'])
+        if CONF.network.backend == 'nsxp':
+            time.sleep(constants.NSXP_BACKEND_SMALL_TIME_INTERVAL)
+            nsx_router_policy = self.nsxp.get_logical_router(
+                self.router['name'], self.router['id'])
+            LOG.debug("NSX policy router on backend: %s", nsx_router_policy)
+            nat_rules_policy = self.nsxp.get_logical_router_nat_rules(
+                nsx_router_policy)
+            LOG.debug("NAT rules on NSX router %(router)s: %(rules)s",
+                      {'router': nsx_router_policy, 'rules': nat_rules_policy})
+            dnat_rules_policy = [(rule['translated_network'],
+                                  rule['destination_network'])
+                                 for rule in nat_rules_policy
+                                 if rule['action'] == 'DNAT']
+            snat_rules_policy = [(rule['translated_network'],
+                                  rule['source_network'])
+                                 for rule in nat_rules_policy
+                                 if 'source_network' in rule]
+            LOG.debug("snat_rules: %(snat)s; dnat_rules: %(dnat)s",
+                      {'snat': snat_rules_policy,
+                       'dnat': dnat_rules_policy})
+            self.assertNotIn((fip['floating_ip_address'], port_ip),
+                             snat_rules_policy)
+            self.assertNotIn((port_ip, fip['floating_ip_address']),
+                             dnat_rules_policy)
+        nsx_router = self.nsx.get_logical_router(self.router['name'],
+                                                 self.router['id'])
+        LOG.debug("NSX router on backend: %s", nsx_router)
         nat_rules = self.nsx.get_logical_router_nat_rules(nsx_router)
         LOG.debug("NAT rules on NSX router %(router)s: %(rules)s",
                   {'router': nsx_router, 'rules': nat_rules})
