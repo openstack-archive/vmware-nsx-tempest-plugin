@@ -240,8 +240,8 @@ class TestRouterNoNATOps(manager.NetworkScenarioTest):
                                 (ssh_source, remote_ip, should_connect),
                                 msg)
             except Exception:
-                LOG.exception("Unable to access %{dest}s via ssh to "
-                              "floating-ip %{src}s",
+                LOG.exception("Unable to access %(dest)s via ssh to "
+                              "floating-ip %(src)s",
                               {'dest': remote_ip, 'src': floating_ip})
                 raise
 
