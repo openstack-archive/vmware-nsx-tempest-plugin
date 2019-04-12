@@ -165,6 +165,38 @@ class TestAllowedAddressPair(manager.NetworkScenarioTest):
                         subnet=self.subnet, router=self.router)
         return networks
 
+    def create_ipv4v6_slaac_network_topo(self):
+        name = "ipv4v6-network"
+        networks_client = self.cmgr_adm.networks_client
+        network = self.create_topology_network(name,
+            networks_client=networks_client)
+        self.assertIsNotNone(network['id'])
+        self.security_group = self._create_security_group()
+        #Create a router and set gateway to an IPv6 external network
+        router = self.create_topology_router(
+            "ipv6-rtr", routers_client=self.cmgr_adm.routers_client)
+        subnet_client = self.cmgr_adm.subnets_client
+        ipv4_subnet_name = network['name'] + 'ipv4-sub'
+        ipv4_subnet = self.create_topology_subnet(ipv4_subnet_name, network,
+            subnets_client=subnet_client,
+            routers_client=self.cmgr_adm.routers_client,
+            cidr='14.168.1.0/24',
+            router_id=router['id'])
+        ipv6_subnet_name = network['name'] + 'ipv6-sub'
+        ipv6_subnet = self.create_topology_subnet(ipv6_subnet_name, network,
+            subnets_client=subnet_client,
+            ip_version=6, ipv6_ra_mode='slaac',
+            ipv6_address_mode='slaac',
+            cidr="2000:20:20::/64",
+            routers_client=self.cmgr_adm.routers_client,
+            router_id=router['id'])
+        networks = dict(security_group=self.security_group,
+                        network=self.network,
+                        v4_subnet = ipv4_subnet,
+                        v6_subnet = ipv6_subnet,
+                        router=self.router)
+        return networks
+
     def _check_server_connectivity(self, floating_ip,
                                    remote_ip, private_key,
                                    should_connect=True):
@@ -184,6 +216,10 @@ class TestAllowedAddressPair(manager.NetworkScenarioTest):
     def _assign_ip_address(self, ssh_source, interface_name, ip_address):
         ssh_source.exec_command("sudo ifconfig %s %s/24 up" % (interface_name,
                                                                ip_address))
+
+    def _assign_ipv6_address(self, ssh_source, interface_name, ip_address):
+        ssh_source.exec_command("sudo ifconfig %s inet6 add %s/64 up" % (
+            interface_name, ip_address))
 
     def _assign_mac_address(self, ssh_source, interface_name, mac_address):
         ssh_source.exec_command("sudo ifconfig %s down" % interface_name)
@@ -439,6 +475,144 @@ class TestAllowedAddressPair(manager.NetworkScenarioTest):
                         (ssh_source1, ip_address_vm1_2, 'True'),
                         'Destination is reachable')
 
+    def _test_allowed_address_pair_on_vms_with_ipv4v6_ips(
+            self, network_topo):
+        server_name_default = data_utils.rand_name('server-default')
+        network = network_topo['network']
+        server_default = self._create_server(server_name_default, network)
+        server_name_default1 = \
+            data_utils.rand_name('server-default1-sec-group')
+        server_default1 = self._create_server(server_name_default1, network)
+        floating_ip_default = self.create_floating_ip(server_default)
+        floating_ip_default1 = self.create_floating_ip(server_default1)
+        ip_address_default_vm = floating_ip_default['floating_ip_address']
+        ip_address_default1_vm = floating_ip_default1['floating_ip_address']
+        private_key_default_vm = self._get_server_key(server_default)
+        private_key_default1_vm = self._get_server_key(server_default1)
+        port_client = self.ports_client
+        # Allowed Address pair
+        ipv4_address_vm1 = '77.0.0.3'
+        ipv6_address_vm1 = '3000:10:10::2'
+        ipv4_address_vm2 = '77.0.0.4'
+        ipv6_address_vm2 = '3000:10:10::3'
+        port_id = self.get_port_id(network['id'],
+                                   network_topo['v4_subnet']['id'],
+                                   server_default)
+        # Update allowed address pair attribute of port
+        allowed_address_pairs = [{'ip_address': ipv4_address_vm1},
+                                 {'ip_address': ipv6_address_vm1}]
+        port_client.update_port(
+            port_id, allowed_address_pairs=allowed_address_pairs)
+        port1_id = self.get_port_id(network['id'],
+                                    network_topo['v4_subnet']['id'],
+                                    server_default1)
+        # Update allowed address pair attribute of port
+        allowed_address_pairs = [{'ip_address': ipv4_address_vm2},
+                                 {'ip_address': ipv6_address_vm2}]
+        port_client.update_port(
+            port1_id, allowed_address_pairs=allowed_address_pairs)
+        ssh_source = self.get_remote_client(ip_address_default_vm,
+                                            private_key=private_key_default_vm)
+        ssh_source1 = self.get_remote_client(
+            ip_address_default1_vm,
+            private_key=private_key_default1_vm)
+        # Attach allowed pair ip's to vm's
+        self._assign_ip_address(ssh_source, 'eth0:1', ipv4_address_vm1)
+        self._assign_ipv6_address(ssh_source, 'eth0:2', ipv6_address_vm1)
+        self._assign_ip_address(ssh_source1, 'eth0:1', ipv4_address_vm2)
+        self._assign_ipv6_address(ssh_source1, 'eth0:2', ipv6_address_vm2)
+        self.assertTrue(self._check_remote_connectivity
+                        (ssh_source, ipv4_address_vm2, 'True'),
+                        'Destination is reachable')
+        self.assertTrue(self._check_remote_connectivity
+                        (ssh_source, ipv6_address_vm2, 'True'),
+                        'Destination is reachable')
+        self.assertTrue(self._check_remote_connectivity
+                        (ssh_source1, ipv4_address_vm1, 'True'),
+                        'Destination is reachable')
+        self.assertTrue(self._check_remote_connectivity
+                        (ssh_source1, ipv6_address_vm1, 'True'),
+                        'Destination is reachable')
+
+    def _test_allowed_address_pair_on_vms_with_multiple_ipv4v6_ips(
+            self, network_topo):
+        server_name_default = data_utils.rand_name('server-default')
+        network = network_topo['network']
+        server_default = self._create_server(server_name_default, network)
+        server_name_default1 = \
+            data_utils.rand_name('server-default1-sec-group')
+        server_default1 = self._create_server(server_name_default1, network)
+        floating_ip_default = self.create_floating_ip(server_default)
+        floating_ip_default1 = self.create_floating_ip(server_default1)
+        ip_address_default_vm = floating_ip_default['floating_ip_address']
+        ip_address_default1_vm = floating_ip_default1['floating_ip_address']
+        private_key_default_vm = self._get_server_key(server_default)
+        private_key_default1_vm = self._get_server_key(server_default1)
+        port_client = self.ports_client
+        # Allowed Address pair
+        ipv4_address_vm1_1 = '77.0.0.3'
+        ipv6_address_vm1_1 = '3000:10:10::2'
+        ipv4_address_vm1_2 = '77.0.0.5'
+        ipv6_address_vm1_2 = '3000:10:10::4'
+        ipv4_address_vm2_1 = '77.0.0.4'
+        ipv6_address_vm2_1 = '3000:10:10::3'
+        ipv4_address_vm2_2 = '77.0.0.6'
+        ipv6_address_vm2_2 = '3000:10:10::5'
+        port_id = self.get_port_id(network['id'],
+                                   network_topo['v4_subnet']['id'],
+                                   server_default)
+        # Update allowed address pair attribute of port
+        allowed_address_pairs = [{'ip_address': ipv4_address_vm1_1},
+                                 {'ip_address': ipv6_address_vm1_1},
+                                 {'ip_address': ipv4_address_vm1_2},
+                                 {'ip_address': ipv6_address_vm1_2}]
+        port_client.update_port(
+            port_id, allowed_address_pairs=allowed_address_pairs)
+        port1_id = self.get_port_id(network['id'],
+                                    network_topo['v4_subnet']['id'],
+                                    server_default1)
+        # Update allowed address pair attribute of port
+        allowed_address_pairs = [{'ip_address': ipv4_address_vm2_1},
+                                 {'ip_address': ipv6_address_vm2_1},
+                                 {'ip_address': ipv4_address_vm2_2},
+                                 {'ip_address': ipv6_address_vm2_2}]
+        port_client.update_port(
+            port1_id, allowed_address_pairs=allowed_address_pairs)
+        ssh_source = self.get_remote_client(ip_address_default_vm,
+                                            private_key=private_key_default_vm)
+        ssh_source1 = self.get_remote_client(
+            ip_address_default1_vm,
+            private_key=private_key_default1_vm)
+        # Attach allowed pair ip's to vm's
+        self._assign_ip_address(ssh_source, 'eth0:1', ipv4_address_vm1)
+        self._assign_ipv6_address(ssh_source, 'eth0:2', ipv6_address_vm1)
+        self._assign_ip_address(ssh_source1, 'eth0:1', ipv4_address_vm2)
+        self._assign_ipv6_address(ssh_source1, 'eth0:2', ipv6_address_vm2)
+        self.assertTrue(self._check_remote_connectivity
+                        (ssh_source, ipv4_address_vm2_1, 'True'),
+                        'Destination is reachable')
+        self.assertTrue(self._check_remote_connectivity
+                        (ssh_source, ipv6_address_vm2_1, 'True'),
+                        'Destination is reachable')
+        self.assertTrue(self._check_remote_connectivity
+                        (ssh_source, ipv4_address_vm2_2, 'True'),
+                        'Destination is reachable')
+        self.assertTrue(self._check_remote_connectivity
+                        (ssh_source, ipv6_address_vm2_2, 'True'),
+                        'Destination is reachable')
+        self.assertTrue(self._check_remote_connectivity
+                        (ssh_source1, ipv4_address_vm1_1, 'True'),
+                        'Destination is reachable')
+        self.assertTrue(self._check_remote_connectivity
+                        (ssh_source1, ipv6_address_vm1_1, 'True'),
+                        'Destination is reachable')
+        self.assertTrue(self._check_remote_connectivity
+                        (ssh_source1, ipv4_address_vm1_2, 'True'),
+                        'Destination is reachable')
+        self.assertTrue(self._check_remote_connectivity
+                        (ssh_source1, ipv6_address_vm1_2, 'True'),
+                        'Destination is reachable')
+
     def _test_vm_accessible_using_allowed_adddress_pair_port_fip(
             self, network_topo):
         server_name_default = data_utils.rand_name('server-default')
@@ -520,4 +694,22 @@ class TestAllowedAddressPair(manager.NetworkScenarioTest):
     def test_vm_accessible_using_allowed_adddress_pair_port_fip(self):
         self.network_topo = self.create_network_topo()
         self._test_vm_accessible_using_allowed_adddress_pair_port_fip(
+            self.network_topo)
+
+    @decorators.attr(type=['nsxv3', 'positive'])
+    @decorators.idempotent_id('18a01771-a8a8-4c5f-ac66-41481b32e774')
+    def test_allowed_address_pair_on_vms_with_ipv4v6_ips(self):
+        """Test allowed address pair with IPv4 and IPv6 addresses
+           and verify connecitivity across both v4 and v6"""
+        self.network_topo = self.create_ipv4v6_slaac_network_topo()
+        self._test_allowed_address_pair_on_vms_with_ipv4v6_ips(
+            self.network_topo)
+
+    @decorators.attr(type=['nsxv3', 'positive'])
+    @decorators.idempotent_id('18a01771-a8a8-4c5f-ac66-41481b32e774')
+    def test_allowed_address_pair_on_vms_with_multiple_ipv4v6_ips(self):
+        """Test allowed address pair with IPv4 and IPv6 addresses
+           and verify connecitivity across both v4 and v6"""
+        self.network_topo = self.create_ipv4v6_slaac_network_topo()
+        self._test_allowed_address_pair_on_vms_with_multiple_ipv4v6_ips(
             self.network_topo)
