@@ -115,11 +115,9 @@ class IPv6PortsTest(feature_manager.FeatureManager):
         for security_group in security_groups_list:
             self.assertIn(security_group, port_show['security_groups'])
 
-    def _create_ipv6_topology(self):
-        name = "ipv6-network"
-        networks_client = self.cmgr_adm.networks_client
-        network = self.create_topology_network(name,
-                                               networks_client=networks_client)
+    def _create_ipv6_subnet(self, network, slaac=False):
+        subnet_client = self.cmgr_adm.subnets_client
+        subnet_name = network['name'] + 'sub'
         address_cidr = CONF.network.project_network_v6_cidr
         address_prefixlen = CONF.network.project_network_v6_mask_bits
         if ((address_prefixlen >= 126)):
@@ -128,12 +126,37 @@ class IPv6PortsTest(feature_manager.FeatureManager):
         allocation_pools = {'allocation_pools': [{
                             'start': str(address_cidr).split('/')[0] + '2',
                             'end':str(address_cidr).split('/')[0] + '70'}]}
+        if slaac:
+            self.create_topology_subnet(subnet_name, network,
+                subnets_client=subnet_client,
+                ip_version=6, ipv6_ra_mode='slaac',
+                ipv6_address_mode='slaac',
+                **allocation_pools)
+        else:
+            self.create_topology_subnet(subnet_name, network,
+                subnets_client=subnet_client,
+                ip_version=6, enable_dhcp=False,
+                **allocation_pools)
+
+    def _create_ipv6_topology(self, slaac=False):
+        name = "ipv6-network"
+        networks_client = self.cmgr_adm.networks_client
+        network = self.create_topology_network(name,
+                                               networks_client=networks_client)
+        self._create_ipv6_subnet(network, slaac=slaac)
+        return network
+
+    def _create_ipv4_v6_topology(self, slaac=False):
+        name = "ipv4v6-network"
+        networks_client = self.cmgr_adm.networks_client
+        network = self.create_topology_network(name,
+                                               networks_client=networks_client)
+        self._create_ipv6_subnet(network, slaac=slaac)
         subnet_client = self.cmgr_adm.subnets_client
-        subnet_name = network['name'] + 'sub'
+        subnet_name = network['name'] + 'ipv4_sub'
         self.create_topology_subnet(subnet_name, network,
                                     subnets_client=subnet_client,
-                                    ip_version=6, enable_dhcp=False,
-                                    **allocation_pools)
+                                    cidr="14.10.1.0/24")
         return network
 
     def _create_ipv6_rtr_topology(self):
@@ -169,7 +192,7 @@ class IPv6PortsTest(feature_manager.FeatureManager):
         Test create port with IPv6 static address
         Verify the address is within the CIDR block
         """
-        network = self._create_ipv6_topology()
+        network = self._create_ipv6_topology(slaac=False)
         port_client = self.cmgr_adm.ports_client
         body = self.create_topology_port(network=network,
                                          ports_client=port_client)
@@ -192,7 +215,7 @@ class IPv6PortsTest(feature_manager.FeatureManager):
         and set admin_state to False
         Verify the update of port options is successful
         """
-        network = self._create_ipv6_topology()
+        network = self._create_ipv6_topology(slaac=False)
         port_client = self.cmgr_adm.ports_client
         body = self.create_topology_port(network=network,
                                          ports_client=port_client)
@@ -211,7 +234,7 @@ class IPv6PortsTest(feature_manager.FeatureManager):
     @decorators.idempotent_id('62009271-562a-4263-bd76-b478bbda2928')
     def test_show_port(self):
         # Verify the details of port
-        network = self._create_ipv6_topology()
+        network = self._create_ipv6_topology(slaac=False)
         port_client = self.cmgr_adm.ports_client
         body = self.create_topology_port(network=network,
                                          ports_client=port_client)
@@ -230,7 +253,7 @@ class IPv6PortsTest(feature_manager.FeatureManager):
     @decorators.idempotent_id('547d2daf-b291-40f0-aa96-873af369847d')
     def test_show_port_fields(self):
         # Verify specific fields of a port
-        network = self._create_ipv6_topology()
+        network = self._create_ipv6_topology(slaac=False)
         port_client = self.cmgr_adm.ports_client
         body = self.create_topology_port(network=network,
                                          ports_client=port_client)
@@ -248,7 +271,7 @@ class IPv6PortsTest(feature_manager.FeatureManager):
     @decorators.idempotent_id('442d05b5-41bf-4d26-8f1a-7426d4c40f95')
     def test_list_ports(self):
         # Verify the port exists in the list of all ports
-        network = self._create_ipv6_topology()
+        network = self._create_ipv6_topology(slaac=False)
         port_client = self.cmgr_adm.ports_client
         body = self.create_topology_port(network=network,
                                          ports_client=port_client)
@@ -265,7 +288,7 @@ class IPv6PortsTest(feature_manager.FeatureManager):
         Verify port list filtering with IPv6 address
         """
         # Create network and subnet
-        network = self._create_ipv6_topology()
+        network = self._create_ipv6_topology(slaac=False)
         port_client = self.cmgr_adm.ports_client
         # Create two ports
         body = self.create_topology_port(network=network,
@@ -332,7 +355,7 @@ class IPv6PortsTest(feature_manager.FeatureManager):
         Verify CRUD operations on a port with user defind mac
         """
         # Create network and subnet
-        network = self._create_ipv6_topology()
+        network = self._create_ipv6_topology(slaac=False)
         port_client = self.cmgr_adm.ports_client
         # Create port
         body = self.create_topology_port(network=network,
@@ -360,7 +383,7 @@ class IPv6PortsTest(feature_manager.FeatureManager):
         'security-group extension not enabled.')
     def test_create_port_with_no_securitygroups(self):
         # Create network and subnet
-        network = self._create_ipv6_topology()
+        network = self._create_ipv6_topology(slaac=False)
         port_client = self.cmgr_adm.ports_client
         # Create port
         body = self.create_topology_port(network=network,
@@ -369,3 +392,61 @@ class IPv6PortsTest(feature_manager.FeatureManager):
         port = body['port']
         self.assertIsNotNone(port['security_groups'])
         self.assertEmpty(port['security_groups'])
+
+    @decorators.attr(type=['nsxv3', 'positive'])
+    @decorators.idempotent_id('3db90519-1518-42f8-b9ca-a7e6f885c387')
+    def test_create_ipv4_static_v6_port_allowed_allocation_pools(self):
+        """
+        Test create port with Ipv4 DHCP and IPv6 static address
+        Verify the address is within the CIDR block
+        """
+        network = self._create_ipv4_v6_topology()
+        port_client = self.cmgr_adm.ports_client
+        body = self.create_topology_port(network=network,
+                                         ports_client=port_client)
+        port = body['port']
+        #Check if the Ipv4 address is within the CIDR block
+        ip_address = port['fixed_ips'][0]['ip_address']
+        start_ip_address = "14.10.1.2"
+        end_ip_address = "14.10.1.254"
+        ip_range = netaddr.IPRange(start_ip_address, end_ip_address)
+        self.assertIn(ip_address, ip_range)
+        #Check if IPv6 address is within the CIDR block
+        ip_address = port['fixed_ips'][1]['ip_address']
+        address_cidr = CONF.network.project_network_v6_cidr
+        allocation_pools = {'allocation_pools': [{
+                            'start': str(address_cidr).split('/')[0] + '2',
+                            'end':str(address_cidr).split('/')[0] + '70'}]}
+        start_ip_address = allocation_pools['allocation_pools'][0]['start']
+        end_ip_address = allocation_pools['allocation_pools'][0]['end']
+        ip_range = netaddr.IPRange(start_ip_address, end_ip_address)
+        self.assertIn(ip_address, ip_range)
+
+    @decorators.attr(type=['nsxv3', 'positive'])
+    @decorators.idempotent_id('7d785948-045b-4990-ace4-33cd7f2b1acc')
+    def test_create_ipv4_slaac_v6_port_allowed_allocation_pools(self):
+        """
+        Test create port with Ipv4 DHCP and IPv6 slaac address
+        Verify the address is within the CIDR block
+        """
+        network = self._create_ipv4_v6_topology(slaac=True)
+        port_client = self.cmgr_adm.ports_client
+        body = self.create_topology_port(network=network,
+                                         ports_client=port_client)
+        port = body['port']
+        #Check if the Ipv4 address is within the CIDR block
+        ip_address = port['fixed_ips'][0]['ip_address']
+        start_ip_address = "14.10.1.2"
+        end_ip_address = "14.10.1.254"
+        ip_range = netaddr.IPRange(start_ip_address, end_ip_address)
+        self.assertIn(ip_address, ip_range)
+        #Check if IPv6 address is within the CIDR block
+        ip_address = port['fixed_ips'][1]['ip_address']
+        address_cidr = CONF.network.project_network_v6_cidr
+        allocation_pools = {'allocation_pools': [{
+                            'start': str(address_cidr).split('/')[0] + '2',
+                            'end':str(address_cidr).split('/')[0] + '70'}]}
+        start_ip_address = allocation_pools['allocation_pools'][0]['start']
+        end_ip_address = allocation_pools['allocation_pools'][0]['end']
+        ip_range = netaddr.IPRange(start_ip_address, end_ip_address)
+        self.assertIn(ip_address, ip_range)
