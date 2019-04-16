@@ -408,15 +408,20 @@ class NSXV3Client(object):
         """
         return self.get_logical_resources("/ns-groups")
 
-    def get_neutron_ns_group_id(self):
+    def get_neutron_ns_group_id(self, nsxp=False):
         """
         Retrieve NSGroup Id
         """
         nsx_nsgroup = self.get_ns_groups()
-        for group in nsx_nsgroup:
-            if group['display_name'] == 'neutron_excluded_port_nsgroup':
-                nsgroup_id = group['id']
-                return nsgroup_id
+        if nsxp:
+            for group in nsx_nsgroup:
+                if group['display_name'] == 'default.neutron_excluded_ports_group':
+                    nsgroup_id = group['id']
+        else:   
+            for group in nsx_nsgroup:
+                if group['display_name'] == 'neutron_excluded_port_nsgroup':
+                    nsgroup_id = group['id']
+        return nsgroup_id
 
     def get_ns_group_port_members(self, ns_group_id):
         """
