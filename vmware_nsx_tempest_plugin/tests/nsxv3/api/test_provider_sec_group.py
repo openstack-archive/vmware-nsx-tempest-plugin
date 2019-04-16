@@ -21,8 +21,9 @@ from tempest.lib.common.utils import test_utils
 from tempest.lib import decorators
 from tempest.lib import exceptions
 
-from tempest import test
 from vmware_nsx_tempest_plugin.common import constants
+from tempest import test
+from vmware_nsx_tempest_plugin.services import nsxp_client
 from vmware_nsx_tempest_plugin.services import nsxv3_client
 
 CONF = config.CONF
@@ -61,6 +62,9 @@ class ProviderSecurityGroupTest(base.BaseAdminNetworkTest):
         cls.nsx = nsxv3_client.NSXV3Client(CONF.nsxv3.nsx_manager,
                                            CONF.nsxv3.nsx_user,
                                            CONF.nsxv3.nsx_password)
+        cls.nsxp = nsxp_client.NSXPClient(CONF.nsxv3.nsx_manager,
+                                          CONF.nsxv3.nsx_user,
+                                          CONF.nsxv3.nsx_password)
         cls.network = cls.create_network()
 
     def delete_security_group(self, sg_client, sg_id):
@@ -108,7 +112,8 @@ class ProviderSecurityGroupTest(base.BaseAdminNetworkTest):
         sg = sg_client.show_security_group(security_group_id)
         return sg.get('security_group', sg)
 
-    def _wait_till_firewall_gets_realize(self, secgroup, dfw_error_msg=""):
+    def _wait_till_firewall_gets_realize(self, secgroup, dfw_error_msg="",
+                                         tenant_id=None):
         nsx_firewall_time_counter = 0
         nsx_dfw_section = None
         # wait till timeout or till dfw section
@@ -116,10 +121,29 @@ class ProviderSecurityGroupTest(base.BaseAdminNetworkTest):
                 constants.NSX_FIREWALL_REALIZED_TIMEOUT and \
                 not nsx_dfw_section:
             nsx_firewall_time_counter += 1
-            nsx_nsgroup = self.nsx.get_ns_group(secgroup['name'],
-                                                secgroup['id'])
-            nsx_dfw_section = self.nsx.get_firewall_section(secgroup['name'],
-                                                            secgroup['id'])
+            if CONF.network.backend == 'nsxp':
+                time.sleep(constants.NSXP_BACKEND_SMALL_TIME_INTERVAL)
+                nsx_nsgroup_policy = self.nsxp.get_ns_group(
+                    secgroup['name'], secgroup['id'],
+                    os_tenant_id=tenant_id)
+                nsx_dfw_section_policy = self.nsxp.get_firewall_section(
+                    secgroup['name'], secgroup['id'],
+                    os_tenant_id=tenant_id)
+                nsx_nsgroup = self.nsx.get_ns_group(
+                    secgroup['name'], secgroup['id'], nsxp=True,
+                    os_tenant_id=tenant_id)
+                nsx_dfw_section = self.nsx.get_firewall_section(
+                    secgroup['name'], secgroup['id'], nsxp=True)
+                self.assertIsNotNone(nsx_nsgroup_policy)
+                self.assertIsNotNone(nsx_dfw_section_policy,
+                                     dfw_error_msg)
+                self.assertIsNotNone(nsx_nsgroup)
+                self.assertIsNotNone(nsx_dfw_section, dfw_error_msg)
+            else:
+                nsx_nsgroup = self.nsx.get_ns_group(secgroup['name'],
+                                                    secgroup['id'])
+                nsx_dfw_section = self.nsx.get_firewall_section(
+                    secgroup['name'], secgroup['id'])
             time.sleep(constants.ONE_SEC)
         self.assertIsNotNone(nsx_nsgroup)
         self.assertIsNotNone(nsx_dfw_section, dfw_error_msg)
@@ -135,7 +159,13 @@ class ProviderSecurityGroupTest(base.BaseAdminNetworkTest):
                                                   protocol='icmp')
         sg_rule.get('id')
         time.sleep(constants.NSX_BACKEND_TIME_INTERVAL)
-        self.assertNotEmpty(self.nsx.get_firewall_section(sg_name, sg_id))
+        if CONF.network.backend == 'nsxp':
+            self.assertNotEmpty(self.nsxp.get_firewall_section(
+                sg_name, sg_id, sg.get('tenant_id')))
+            self.assertNotEmpty(self.nsx.get_firewall_section(sg_name, sg_id,
+                                                              nsxp=True))
+        else:
+            self.assertNotEmpty(self.nsxp.get_firewall_section(sg_name, sg_id))
 
     @decorators.attr(type='nsxv3')
     @decorators.idempotent_id('2c8d013d-4c0b-4d2b-b77c-779351a789ce')
@@ -199,9 +229,19 @@ class ProviderSecurityGroupTest(base.BaseAdminNetworkTest):
                                                   protocol='icmp')
         sg_rule.get('id')
         dfw_error_msg = "Firewall section not found for %s!" % sg_name
-        self._wait_till_firewall_gets_realize(sg, dfw_error_msg)
-        firewall_section = self.nsx.get_firewall_section(sg_name, sg_id)
-        output = self.nsx.get_firewall_section_rules(firewall_section)
+        self._wait_till_firewall_gets_realize(sg, dfw_error_msg,
+                                              tenant_id=sg.get('tenant_id'))
+        if CONF.network.backend == 'nsxp':
+            firewall_section = self.nsxp.get_firewall_section(
+                sg_name, sg_id, sg.get('tenant_id'))
+        else:
+            firewall_section = self.nsx.get_firewall_section(sg_name, sg_id)
+        if CONF.network.backend == 'nsxp':
+            output = self.nsxp.get_firewall_section_rules(
+                firewall_section,
+                tenant_id=sg.get('tenant_id'))
+        else:
+            output = self.nsx.get_firewall_section_rules(firewall_section)
         self.assertEqual('DROP', output[0]['action'])
 
     @decorators.attr(type='nsxv3')
@@ -519,7 +559,11 @@ class ProviderSecurityGroupTest(base.BaseAdminNetworkTest):
         while nsx_firewall_time_counter < \
                 constants.NSX_FIREWALL_REALIZED_TIMEOUT and not provider_sec:
             nsx_firewall_time_counter += 1
-            firewall_sections = self.nsx.get_firewall_sections()
+            if CONF.network.backend == 'nsxp':
+                firewall_sections = self.nsxp.get_firewall_sections(
+                    tenant_id=provider_sg['tenant_id'])
+            else:
+                firewall_sections = self.nsx.get_firewall_sections()
             for section in firewall_sections:
                 if provider_sg_name in section['display_name']:
                     provider_sec = True
@@ -529,8 +573,9 @@ class ProviderSecurityGroupTest(base.BaseAdminNetworkTest):
             # when execute tempest in parallel fashion,
             # we create provider security group for other tests,
             # NSX will return all provider security group from DFW.
-            if section['applied_tos'][0]['target_type'] == "LogicalRouter":
-                continue
+            if CONF.network.backend != 'nsxp':
+                if section['applied_tos'][0]['target_type'] == "LogicalRouter":
+                    continue
             if PROVIDER_SECURITY_GRP in section['display_name'] and \
                     provider_sg_name not in section['display_name']:
                 pass
