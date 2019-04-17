@@ -15,13 +15,13 @@
 
 import json
 import six
-
-from tempest.lib.common import rest_client
-from tempest.lib.common.utils import data_utils
+import time
 
 from oslo_log import log
-
 from tempest import config
+from tempest.lib.common.utils import data_utils
+from tempest.lib.common import rest_client
+from tempest.lib import exceptions
 from tempest.lib.services.network import base
 
 from vmware_nsx_tempest_plugin.common import constants
@@ -620,3 +620,162 @@ class ContainerClient(rest_client.RestClient):
                               json.dumps(kwargs))
         self.expected_success(200, resp.status)
         return body
+
+
+class OctaviaLB_Client(base.BaseNetworkClient):
+    """
+    The Client takes care of
+        Creating LB,
+        Deleting LB,
+        Returning the status
+        Listing the status tree.
+    """
+    LB_NOTFOUND = "loadbalancer {lb_id} not found"
+    resource = 'loadbalancer'
+    resource_plural = 'loadbalancers'
+    path = 'lbaas/loadbalancers'
+    resource_base_path = '/%s' % path
+    resource_object_path = '/%s/%%s' % path
+    resource_object_status_path = '/%s/%%s/statuses' % path
+    resource_object_stats_path = '/%s/%%s/stats' % path
+
+    def create_octavia_load_balancer(self, **kwargs):
+        uri = self.resource_base_path
+        post_data = {self.resource: kwargs}
+        return self.create_resource(uri, post_data)
+
+    def show_octavia_load_balancer(self, load_balancer_id, **fields):
+        uri = self.resource_object_path % load_balancer_id
+        return self.show_resource(uri, **fields)
+
+    def delete_octavia_load_balancer(self, load_balancer_id):
+        uri = self.resource_object_path % load_balancer_id
+        return self.delete_resource(uri)
+
+    def show_octavia_lb_status_tree(self, load_balancer_id, **fields):
+        uri = self.resource_object_status_path % load_balancer_id
+        return self.show_resource(uri, **fields)
+
+    def list_octavia_load_balancers(self, **filters):
+        uri = self.resource_base_path
+        return self.list_resources(uri, **filters)
+
+    def wait_for_load_balancer_status(self, load_balancer_id,
+                                      provisioning_status='ACTIVE',
+                                      operating_status='ONLINE',
+                                      is_delete_op=False):
+        """
+        This method is helpful to get the info of
+        Loadbalancer's status as the octavia process is async
+        we need to check the status of lb to be ACTIVE before
+        moving ahead.
+        """
+        LB_NOTFOUND = "loadbalancer {lb_id} not found"
+        interval_time = self.build_interval
+        timeout = self.build_timeout
+        end_time = time.time() + 2 * timeout
+        lb = None
+        while time.time() < end_time:
+            try:
+                lb = self.show_octavia_load_balancer(load_balancer_id)
+                if not lb:
+                    if is_delete_op:
+                        break
+                    else:
+                        raise Exception(
+                            LB_NOTFOUND.format(lb_id=load_balancer_id))
+                lb = lb.get(self.resource, lb)
+                if (lb.get('provisioning_status') == provisioning_status and
+                        lb.get('operating_status') == operating_status):
+                    break
+                time.sleep(interval_time)
+            except exceptions.NotFound as e:
+                if is_delete_op:
+                    break
+                else:
+                    raise e
+        else:
+            if is_delete_op:
+                raise exceptions.TimeoutException(
+                    ("load balancer {lb_id} is still active"
+                     "after {timeout} seconds").format(
+                        lb_id=load_balancer_id,
+                        timeout=timeout))
+            else:
+                raise exceptions.TimeoutException(
+                    ("Wait for load balancer ran for {timeout} seconds and "
+                     "did not observe {lb_id} reach {provisioning_status} "
+                     "provisioning status and {operating_status} "
+                     "operating status.").format(
+                        timeout=timeout,
+                        lb_id=load_balancer_id,
+                        provisioning_status=provisioning_status,
+                        operating_status=operating_status))
+        return lb
+
+
+class OctaviaListenersClient(base.BaseNetworkClient):
+    """
+    The Client is responsible for
+        Creating Listener
+        Deleting Listener
+    """
+    resource = 'listener'
+    resource_plural = 'listeners'
+    path = 'lbaas/listeners'
+    resource_base_path = '/%s' % path
+    resource_object_path = '/%s/%%s' % path
+
+    def create_octavia_listener(self, **kwargs):
+        uri = self.resource_base_path
+        post_data = {self.resource: kwargs}
+        return self.create_resource(uri, post_data)
+
+    def delete_octavia_listener(self, listener_id):
+        uri = self.resource_object_path % listener_id
+        return self.delete_resource(uri)
+
+
+class OctaviaPoolsClient(base.BaseNetworkClient):
+    """
+    The client is responsible for
+        Creating pool
+        Deleting pool
+    """
+    resource = 'pool'
+    resource_plural = 'pools'
+    path = 'lbaas/pools'
+    resource_base_path = '/%s' % path
+    resource_object_path = '/%s/%%s' % path
+
+    def create_octavia_pool(self, **kwargs):
+        uri = self.resource_base_path
+        post_data = {self.resource: kwargs}
+        return self.create_resource(uri, post_data)
+
+    def delete_octavia_pool(self, pool_id):
+        time.sleep(constants.NSX_BACKEND_TIME_INTERVAL)
+        uri = self.resource_object_path % pool_id
+        return self.delete_resource(uri)
+
+
+class OctaviaMembersClient(base.BaseNetworkClient):
+    """
+    The Client is responsible for
+        Creating members for the pool
+        Deleting members from the pool
+    """
+    resource = 'member'
+    resource_plural = 'members'
+    path = 'lbaas/members'
+    resource_base_path = '/lbaas/pools/%s/members'
+    resource_object_path = '/lbaas/pools/%s/members/%s'
+
+    def create_octavia_member(self, pool_id, **kwargs):
+        uri = self.resource_base_path % pool_id
+        post_data = {self.resource: kwargs}
+        return self.create_resource(uri, post_data)
+
+    def delete_octavia_member(self, pool_id, member_id):
+        uri = self.resource_object_path % (pool_id, member_id)
+        return self.delete_resource(uri)
