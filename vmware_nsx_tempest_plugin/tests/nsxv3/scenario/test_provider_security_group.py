@@ -19,10 +19,10 @@ import time
 from oslo_log import log as logging
 
 from tempest import config
+from tempest import test
 from tempest.lib.common.utils import data_utils
 from tempest.lib.common.utils import test_utils
 from tempest.lib import decorators
-from tempest import test
 
 from vmware_nsx_tempest_plugin.common import constants
 from vmware_nsx_tempest_plugin.services import nsxv3_client
