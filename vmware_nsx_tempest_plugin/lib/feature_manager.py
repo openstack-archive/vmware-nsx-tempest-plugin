@@ -34,6 +34,11 @@ from vmware_nsx_tempest_plugin.services.lbaas import members_client
 from vmware_nsx_tempest_plugin.services.lbaas import pools_client
 from vmware_nsx_tempest_plugin.services import nsx_client
 from vmware_nsx_tempest_plugin.services import openstack_network_clients
+from vmware_nsx_tempest_plugin.services import octavia_loadbalancer_client
+from vmware_nsx_tempest_plugin.services import octavia_listeners_client
+from vmware_nsx_tempest_plugin.services import octavia_pools_client
+from vmware_nsx_tempest_plugin.services import octavia_members_client
+
 
 LOG = constants.log.getLogger(__name__)
 
@@ -124,6 +129,11 @@ class FeatureManager(traffic_manager.IperfManager,
             net_client.region,
             net_client.endpoint_type,
             **_params)
+        net_client.service = 'load-balancer'
+        cls.octavia_admin_client=octavia_loadbalancer_client.get_client(cls.os_admin)
+        cls.octavia_admin_listener_client=octavia_listeners_client.get_client(cls.os_admin)
+        cls.octavia_admin_pools_client=octavia_pools_client.get_client(cls.os_admin)
+        cls.octavia_admin_members_client=octavia_members_client.get_client(cls.os_admin)
         net_client.service = 'dns'
         cls.zones_v2_client = openstack_network_clients.ZonesV2Client(
             net_client.auth_provider,
@@ -1327,3 +1337,131 @@ class FeatureManager(traffic_manager.IperfManager,
             self.assertIn(Present, "True")
         else:
             self.assertIn(Present, "False")
+
+    def delete_octavia_lb_resources(self, lb_id):
+        """Deletion of lbaas resources.
+
+        :param lb_id: Load Balancer ID.
+
+        """
+        oc_client = self.octavia_admin_client
+        statuses = oc_client.show_octavia_lb_status_tree(lb_id)
+        statuses = statuses.get('statuses', statuses)
+        lb = statuses.get('loadbalancer')
+        for listener in lb.get('listeners', []):
+            for pool in listener.get('pools'):
+                self.delete_octavia_lb_pool_resources(lb_id, pool)
+            test_utils.call_and_ignore_notfound_exc(
+                self.octavia_admin_listener_client.delete_listener,
+                listener.get('id'))
+            self.wait_for_octavia_loadbalancer_status(lb_id)
+        # delete pools not attached to listener, but loadbalancer
+        for pool in lb.get('pools', []):
+            self.delete_lb_pool_resources(lb_id, pool)
+        test_utils.call_and_ignore_notfound_exc(
+            oc_client.delete_load_balancer, lb_id)
+        self.octavia_admin_client.wait_for_load_balancer_status(lb_id, is_delete_op=True)
+        lbs = oc_client.list_load_balancers()['loadbalancers']
+        self.assertEqual(0, len(lbs))
+
+    def delete_octavia_lb_pool_resources(self, lb_id, pool):
+        """Deletion of lbaas pool resources.
+
+        :param lb_id: Load Balancer ID.
+        :param pool: pool information.
+
+        """
+        pool_id = pool.get('id')
+        hm = pool.get('healthmonitor')
+        if hm:
+            test_utils.call_and_ignore_notfound_exc(
+                self.health_monitors_client.delete_health_monitor,
+                pool.get('healthmonitor').get('id'))
+            self.wait_for_octavia_loadbalancer_status(lb_id)
+        test_utils.call_and_ignore_notfound_exc(
+            self.octavia_admin_pools_client.delete_pool, pool.get('id'))
+        self.wait_for_octavia_loadbalancer_status(lb_id)
+        for member in pool.get('members', []):
+            test_utils.call_and_ignore_notfound_exc(
+                self.octavia_admin_members_client.delete_member,
+                pool_id, member.get('id'))
+            self.wait_for_octavia_loadbalancer_status(lb_id)
+
+    def wait_for_octavia_loadbalancer_status(self, lb_id):
+        self.octavia_admin_client.wait_for_load_balancer_status(lb_id)
+
+    def create_project_octavia(self, protocol_type,
+                               protocol_port, lb_algorithm,
+                               hm_type=None, member_count=2,
+                               max_vms=None, weight=None,
+                               fip_disassociate=None,
+                               pool_protocol=None, pool_port=None,
+                               vip_subnet_id=None, 
+                               lb_id=None, count=None,
+                               clean_up=None):
+        count = 0
+        lb_name = None
+        if vip_subnet_id is None:
+            vip_subnet_id = self.topology_subnets["subnet_lbaas_1"]['id']
+        if lb_id is None:
+            lb_name = data_utils.rand_name(self.namestart)
+            self.loadbalancer = self.\
+                octavia_admin_client.\
+                create_load_balancer(name=lb_name,
+                                     vip_subnet_id=vip_subnet_id
+                                     )['loadbalancer']
+            lb_id = self.loadbalancer['id']
+            self.octavia_admin_client.wait_for_load_balancer_status(lb_id)
+        self.listener = self.octavia_admin_listener_client.create_octavia_listener(loadbalancer_id=lb_id, protocol=protocol_type,
+                                                                                   protocol_port=protocol_port, name=lb_name)['listener']
+        self.octavia_admin_client.wait_for_load_balancer_status(lb_id)
+        self.pool = self.octavia_admin_pools_client.create_octavia_pool(listener_id=self.listener['id'],
+                                                                        lb_algorithm=lb_algorithm, protocol=protocol_type,
+                                                                        name=lb_name)
+        self.octavia_admin_client.wait_for_load_balancer_status(lb_id)
+        pool_id = self.pool['pool']['id']
+        self.members = []
+        for server_name in self.topology_servers.keys():
+            if count < member_count:
+                fip_data = self.servers_details[server_name].floating_ips[0]
+                fixed_ip_address = fip_data['fixed_ip_address']
+                if fip_disassociate is None:
+                    kwargs = dict(port_id=None)
+                    self.cmgr_adm.floating_ips_client.\
+                        update_floatingip(fip_data['id'],
+                                          **kwargs)['floatingip']
+
+                if weight:
+                    weight += count
+                    member = self.octavia_admin_members_client.create_octavia_member(pool_id, subnet_id=vip_subnet_id,
+                                                                                     address=fixed_ip_address,
+                                                                                     protocol_port=protocol_port,
+                                                                                     weight=weight)
+                else:
+                    member = self.octavia_admin_members_client.create_octavia_member(pool_id, subnet_id=vip_subnet_id,
+                                                                                     address=fixed_ip_address,
+                                                                                     protocol_port=protocol_port)
+                self.octavia_admin_client.wait_for_load_balancer_status(lb_id)
+                self.members.append(member)
+                self.server_names.append(server_name)
+                count += 1
+            else:
+                break
+        self.cmgr_adm.ports_client.update_port(self.loadbalancer['vip_port_id'],
+                                               security_groups=[self.sg['id']])
+        # create floatingip for public network
+        self.cmgr_adm.ports_client.update_port(
+            self.loadbalancer['vip_port_id'],
+            security_groups=[
+                self.sg['id']])
+        vip_fip = self.create_floatingip(
+            self.loadbalancer,
+            client=self.cmgr_adm.floating_ips_client,
+            port_id=self.loadbalancer['vip_port_id'])
+        self.vip_ip_address = vip_fip['floating_ip_address']
+        return dict(lb_id=lb_id,
+                    vip_address=self.vip_ip_address,
+                    pool_id=pool_id,
+                    members=self.members,
+                    listener_id=self.listener['id'])
+
