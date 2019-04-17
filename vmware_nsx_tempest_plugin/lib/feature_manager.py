@@ -33,7 +33,7 @@ from vmware_nsx_tempest_plugin.services.lbaas import load_balancers_client
 from vmware_nsx_tempest_plugin.services.lbaas import members_client
 from vmware_nsx_tempest_plugin.services.lbaas import pools_client
 from vmware_nsx_tempest_plugin.services import nsx_client
-from vmware_nsx_tempest_plugin.services import openstack_network_clients
+
 
 LOG = constants.log.getLogger(__name__)
 
