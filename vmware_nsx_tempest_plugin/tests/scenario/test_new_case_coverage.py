@@ -54,7 +54,8 @@ class TestNewCase(feature_manager.FeatureManager):
     @classmethod
     def resource_setup(cls):
         super(TestNewCase, cls).resource_setup()
-        if CONF.network.backend == "nsxv3":
+        if CONF.network.backend == "nsxv3" \
+           or CONF.network.backend == "nsxp":
             cls.nsx = nsxv3_client.NSXV3Client(CONF.nsxv3.nsx_manager,
                                                CONF.nsxv3.nsx_user,
                                                CONF.nsxv3.nsx_password)
@@ -209,6 +210,56 @@ class TestNewCase(feature_manager.FeatureManager):
                 secclient=sec_client,
                 tenant_id=self.network_state['tenant_id'])
 
+    def _conv_switch_prof_to_dict(self, switch_profiles):
+        switch_prof_dict = {}
+        for i in range(len(switch_profiles)):
+            switch_prof_dict.update(
+                {switch_profiles[i]['key']: switch_profiles[i]['value']})
+        return switch_prof_dict
+
+    def _get_nsx_mac_learning_enabled(self, port):
+        mac_learn_set_bool = False
+        # Get nsxv3 port(expects 'name' set)
+        nsx_port = self.nsx.get_logical_port(port['name'])
+        # Get list of logical port's switch profiles
+        port_swtch_profs = nsx_port['switching_profile_ids']
+        # Convert switch profiles list to dict, key:UUID
+        port_sw_prof_dict = self._conv_switch_prof_to_dict(port_swtch_profs)
+        # Get MAC learning switch profile ID
+        mac_sw_prof_id = port_sw_prof_dict[constants.MAC_SW_PROFILE]
+        # Get MAC learning switch profile json
+        mac_sw_profile_json = self.nsx.get_switching_profile(mac_sw_prof_id)
+        # Get mac-learning state for port
+        if ('mac_learning' in mac_sw_profile_json):
+            nsxport_mac_learning = mac_sw_profile_json[
+                'mac_learning']['enabled']
+            if nsxport_mac_learning:
+                mac_learn_set_bool = True
+        return mac_learn_set_bool
+
+    def _check_mac_learning(self, port, mac_learn_state=True):
+        # Enabling MAC Learning requires port security=False and no sec grps
+        nsxport_mac_learning = self._get_nsx_mac_learning_enabled(port)
+        if mac_learn_state:
+            self.assertEmpty(port['security_groups'],
+                             "Sec grp for mac learn port is not empty")
+            self.assertFalse(port['port_security_enabled'],
+                             "Port security is enabled")
+            self.assertTrue(port['mac_learning_enabled'],
+                            "Mac Learning is not enabled")
+            self.assertEqual(nsxport_mac_learning,
+                             port['mac_learning_enabled'],
+                             "OS and NSX mac learn states don't match")
+        else:
+            self.assertTrue(port['port_security_enabled'],
+                            "Port security is disabled")
+            if 'mac_learning_enabled' in port.keys():
+                self.assertFalse(port['mac_learning_enabled'],
+                                 "Mac Learning is enabled")
+                self.assertEqual(nsxport_mac_learning,
+                                 port['mac_learning_enabled'],
+                                 "OS and NSX mac learn states don't match")
+
     @decorators.idempotent_id('1206127a-91cc-8905-b217-98844caa35b2')
     def test_router_interface_port_update(self):
         """
@@ -237,15 +288,20 @@ class TestNewCase(feature_manager.FeatureManager):
         topology_dict = self.create_topo_single_network(
             "route-port", create_instance=False)
         network_state = topology_dict['network_state']
+        name = data_utils.rand_name('vmw-port')
         args = {'port_security_enabled': True,
-                'mac_learning_enabled': False}
+                'mac_learning_enabled': False,
+                'name': name}
         port = self.create_topology_port(
             network_state, ports_client=self.cmgr_adm.ports_client, **args)
         port = port['port']
         self.assertEqual(True, port['port_security_enabled'])
-        if 'mac_learning_enabled' in port:
+        if port['mac_learning_enabled']:
             raise Exception("Mac learning is enabled")
         self.assertEqual("ACTIVE", port['status'])
+        if CONF.network.backend == 'nsxp':
+            time.sleep(constants.NSXP_BACKEND_SMALL_TIME_INTERVAL)
+        self._check_mac_learning(port, mac_learn_state=False)
 
     @decorators.idempotent_id('1207349c-91cc-8905-b217-98844caa57d4')
     def test_create_port_with_two_fixed_ip(self):
@@ -469,14 +525,27 @@ class TestNewCase(feature_manager.FeatureManager):
                                                      provider=True)
         network_state = self.create_topology_network("pro-network")
         self.create_topology_subnet("pro-sub", network_state)
+        name = data_utils.rand_name('vmw-port')
+        kwargs = {'name': name}
         port = self.create_topology_port(
-            network_state, ports_client=self.cmgr_adm.ports_client)
+            network_state, ports_client=self.cmgr_adm.ports_client,
+            **kwargs)
         port_id = port.get('port')['id']
         kwargs = {"port_security_enabled": "false",
                   "mac_learning_enabled": "true", "security_groups": [],
                   "provider_security_groups": []}
-        self.update_topology_port(
+        port = self.update_topology_port(
             port_id, ports_client=self.cmgr_adm.ports_client, **kwargs)
+        if CONF.network.backend == 'nsxp':
+            time.sleep(constants.NSXP_BACKEND_SMALL_TIME_INTERVAL)
+        nsxport_mac_learning = self._get_nsx_mac_learning_enabled(port['port'])
+        self.assertFalse(port['port']['port_security_enabled'],
+            "Port security is enabled")
+        self.assertTrue(port['port']['mac_learning_enabled'],
+             "Mac Learning is not enabled")
+        self.assertEqual(nsxport_mac_learning,
+                         port['port']['mac_learning_enabled'],
+                         "OS and NSX mac learn states don't match")
         image_id = self.get_glance_image_id(['cirros', "esx"])
         vm_state = self.create_topology_instance(
             "state_vm_1", create_floating_ip=False,
